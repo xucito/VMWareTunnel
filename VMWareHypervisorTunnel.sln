@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.329
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VMWareHypervisorTunnel", "VMWareHypervisorTunnel\VMWareHypervisorTunnel.csproj", "{0E49A803-4B63-4039-8C55-0ED8ED4F9017}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VMWareHypervisorTunnelConsole", "VMWareHypervisorTunnelConsole\VMWareHypervisorTunnelConsole.csproj", "{6F3A4ED4-1A77-4D7E-895C-369240416973}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0E49A803-4B63-4039-8C55-0ED8ED4F9017}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E49A803-4B63-4039-8C55-0ED8ED4F9017}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E49A803-4B63-4039-8C55-0ED8ED4F9017}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E49A803-4B63-4039-8C55-0ED8ED4F9017}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F3A4ED4-1A77-4D7E-895C-369240416973}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F3A4ED4-1A77-4D7E-895C-369240416973}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F3A4ED4-1A77-4D7E-895C-369240416973}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F3A4ED4-1A77-4D7E-895C-369240416973}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4A2E13C2-FAFF-4098-870B-BDAF69BD5CAF}
+	EndGlobalSection
+EndGlobal
