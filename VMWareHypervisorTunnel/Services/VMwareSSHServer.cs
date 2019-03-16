@@ -51,9 +51,7 @@ namespace VMWareHypervisorTunnel.Services
                 channels.Remove(deletionKey);
             }
 
-            _server.Stop();
-            _server.Dispose();
-            _server = null;
+            //_server.Stop();
         }
 
         static void server_ConnectionAccepted(object sender, Session e)
@@ -195,6 +193,14 @@ namespace VMWareHypervisorTunnel.Services
                 e.Channel.CloseReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].OnClose();
                 e.Channel.DataReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].OnData(ee);
             }
+
+            e.Channel.CloseReceived += (ss, ee) => CloseChannel(port, e.Channel.ServerChannelId);
+        }
+
+
+        static void CloseChannel(int port, uint channel)
+        {
+            channels.Remove(GetChannelId(port, channel));
         }
     }
 }
