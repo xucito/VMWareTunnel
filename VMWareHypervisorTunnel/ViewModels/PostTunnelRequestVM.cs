@@ -7,6 +7,7 @@ namespace VMWareHypervisorTunnel.ViewModels
 {
     public class PostTunnelRequestVM
     {
+        public string VMName { get; set; }
         public string MoRef { get; set; }
         public string ServiceUrl { get; set; }
         public string VCenterUsername { get; set; }

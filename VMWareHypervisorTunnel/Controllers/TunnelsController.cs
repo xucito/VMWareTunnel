@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using VMWareHypervisorTunnel.Clients;
 using VMWareHypervisorTunnel.Services;
 using VMWareHypervisorTunnel.ViewModels;
 
@@ -68,17 +69,36 @@ namespace VMWareHypervisorTunnel.Controllers
             {
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
-                var client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.VMRootUsername, value.VMRootPassword, value.MoRef, value.VMExecutingUsername, value.VMExecutingPassword);
-
+                VMWareClient client = null;
                 var response = new HttpResponseMessage(HttpStatusCode.OK);
+
+                if ((value.VMName != "" && value.VMName != null))
+                {
+                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.VMRootUsername, value.VMRootPassword, value.VMName, value.MoRef, value.VMExecutingUsername, value.VMExecutingPassword);
+                }
+                else if(value.MoRef != "" && value.MoRef != null)
+                {
+                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.VMRootUsername, value.VMRootPassword, value.MoRef, value.VMExecutingUsername, value.VMExecutingPassword);
+                }
+                else
+                {
+                    response.StatusCode = HttpStatusCode.BadRequest;
+                    response.Content = new StringContent("Please specify moref, name or both.");
+                    return response;
+                }
+
+                response = new HttpResponseMessage(HttpStatusCode.OK);
 
                 response.Content = new StringContent(JsonConvert.SerializeObject(new
                 {
                     Port = GlobalTunnelRouter.InitializeTunnel(client),
-                    MoRef = value.MoRef,
+                    MoRef = client.MoRef,
                     Hostname = client.HostName,
                     ElapsedMs = stopwatch.ElapsedMilliseconds,
-                    TempPath = client.TempPath
+                    TempFilesPath = client.TempPath,
+                    PublicKey = client.PublicKey,
+                    PrivateKeyLocation = client.PrivateFileLocation,
+                    FullVMName = client.FullVMName
                 }), System.Text.Encoding.UTF8, "application/json");
 
                 return response;

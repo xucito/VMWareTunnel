@@ -52,7 +52,7 @@ namespace VMWareHypervisorTunnel.Services.VMWareTunnelHandlers
 
         public override void OnClose()
         {
-            CloseReceived?.Invoke(this, 0);
+            //CloseReceived?.Invoke(this, 0);
         }
 
         public override void Print(string msg)

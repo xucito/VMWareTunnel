@@ -74,7 +74,7 @@ namespace VMWareHypervisorTunnel.Services.VMWareTunnelHandlers
         {
 
             System.Diagnostics.Debug.WriteLine("Detected close");
-            CloseReceived?.Invoke(this, 0);
+            //CloseReceived?.Invoke(this, 0);
         }
 
         public override void Print(string msg)
