@@ -65,6 +65,9 @@ namespace VMWareHypervisorTunnel.Services.VMWareTunnelHandlers
 
         public override void OnEndOfFile()
         {
+            // A 0 is appended on the end causing a mismatching file.
+            cachedFile = cachedFile.Take(cachedFile.Count() - 1).ToList();
+            System.Diagnostics.Debug.WriteLine("Last " + cachedFile.Last());
             _client.UploadFile(scpPath, cachedFile.ToArray(), scpPath);
             DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(scpPath));
             EofReceived?.Invoke(this, EventArgs.Empty);
