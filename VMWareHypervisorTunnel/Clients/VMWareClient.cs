@@ -41,9 +41,7 @@ namespace VMWareHypervisorTunnel.Clients
                 .ServerCertificateValidationCallback +=
                 (sender, cert, chain, sslPolicyErrors) => true;
 
-            ServicePointManager
-                .ServerCertificateValidationCallback +=
-                (sender, cert, chain, sslPolicyErrors) => true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
 
             client = new VimClientImpl();
             client.Connect(serviceUrl);
@@ -125,9 +123,8 @@ namespace VMWareHypervisorTunnel.Clients
                 .ServerCertificateValidationCallback +=
                 (sender, cert, chain, sslPolicyErrors) => true;
 
-            ServicePointManager
-                .ServerCertificateValidationCallback +=
-                (sender, cert, chain, sslPolicyErrors) => true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
 
             client = new VimClientImpl();
             client.Connect(serviceUrl);
@@ -270,7 +267,6 @@ namespace VMWareHypervisorTunnel.Clients
                 auth, new long[] { pid });
             }
             while (process.Count() != 1 || process[0].EndTime == null);
-            //Thread.Sleep(5000);
 
             return true;
         }
