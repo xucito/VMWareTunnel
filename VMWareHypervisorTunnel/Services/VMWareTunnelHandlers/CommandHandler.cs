@@ -62,6 +62,8 @@ namespace VMWareHypervisorTunnel.Services.VMWareTunnelHandlers
             else
             {
                 var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data));
+                result = result.Replace("Connection to 127.0.0.1 closed.", "");
+                result = result.Trim(new char[] { '\n' , '\r'});
                 System.Diagnostics.Debug.WriteLine("Got result: " + result);
                 DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
                 EofReceived?.Invoke(this, EventArgs.Empty);

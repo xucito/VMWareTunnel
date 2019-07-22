@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 using VMware.Vim;
 
@@ -54,12 +55,12 @@ namespace VMWareHypervisorTunnel.Clients
             FullVMName = ((VirtualMachine)foundVM).Name;
             if (foundVM != null)
             {
-                if(moref != "" && moref != null)
+                if (moref != "" && moref != null)
                 {
-                    if(foundVM.MoRef.Value != moref)
+                    if (foundVM.MoRef.Value != moref)
                     {
                         client.Logout();
-                        throw new Exception(vmName +" does not match moref " + moref);
+                        throw new Exception(vmName + " does not match moref " + moref);
                     }
                     else
                     {
@@ -137,7 +138,7 @@ namespace VMWareHypervisorTunnel.Clients
                 Type = "VirtualMachine"
             };
 
-            var foundVM = client.GetView(_vm,null);
+            var foundVM = client.GetView(_vm, null);
 
             FullVMName = ((VirtualMachine)foundVM).Name;
 
@@ -212,9 +213,9 @@ namespace VMWareHypervisorTunnel.Clients
             {
                 ProgramPath = "/usr/bin/ssh-keygen",
                 Arguments = "-t rsa -N \"\" -f " + _baseOutputPath + "/vmwaretunnelkey",
-                WorkingDirectory = "/root"
+                WorkingDirectory = "/tmp"
             });
-            
+
             AwaitProcess(pid);
 
             PublicKey = ReadFile(_vm, auth, _baseOutputPath + "/vmwaretunnelkey.pub");
@@ -222,8 +223,8 @@ namespace VMWareHypervisorTunnel.Clients
             pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
             {
                 ProgramPath = "/usr/bin/cat",
-                Arguments =  _baseOutputPath + "/vmwaretunnelkey.pub >> ~/.ssh/authorized_keys",
-                WorkingDirectory = "/root"
+                Arguments = _baseOutputPath + "/vmwaretunnelkey.pub >> ~/.ssh/authorized_keys",
+                WorkingDirectory = "/tmp"
             });
 
             AwaitProcess(pid);
@@ -271,9 +272,14 @@ namespace VMWareHypervisorTunnel.Clients
             return true;
         }
 
-        public string ExecuteCommand(string command)
+        public string ExecuteCommand(string command, string commandUniqueIdentifier = null)
         {
+            if (commandUniqueIdentifier == null)
+            {
+                commandUniqueIdentifier = Guid.NewGuid().ToString();
+            }
             System.Diagnostics.Debug.WriteLine("Executing command " + command);
+            var outputFileName = "output-" + commandUniqueIdentifier;
 
             var auth = new NamePasswordAuthentication()
             {
@@ -285,14 +291,30 @@ namespace VMWareHypervisorTunnel.Clients
             //fileManager.MakeDirectoryInGuest(_vm, auth, _baseOutputPath, false);
 
             var sshCommand = command;
+            long pid;
+            var fullCommand = "/usr/bin/ssh" + " -i " + PrivateFileLocation + " -o StrictHostKeyChecking=no " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"").Replace("\'", "\\\'") + ")\" &> " + _baseOutputPath + "/" + outputFileName;
+            System.Diagnostics.Debug.WriteLine("Full command path:  " + fullCommand);
 
-            long pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
+          //  if (command.Split(' ')[0] != "/bin/sh")
+           // {
+                pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
+                {
+                    ProgramPath = "/usr/bin/ssh",
+                    Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"","\\\"") + ")\" &> " + _baseOutputPath + "/" + outputFileName,//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
+                    WorkingDirectory = "/tmp"
+                });
+            /*}
+            else
             {
-                ProgramPath = "/usr/bin/ssh",
-                Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no " +"127.0.0.1 \"(" + sshCommand + ")\" &> " + _baseOutputPath + "/output",//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
-                WorkingDirectory = "/root"
-            });
+                pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
+                {
+                    ProgramPath = command.Split(' ')[0],
+                    Arguments = command.Split(new[] { ' ' }, 2)[1] + " &> " + _baseOutputPath + "/" + outputFileName,//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
+                    WorkingDirectory = "/tmp"
+                });
+            }*/
 
+            Thread.Sleep(1000);
             /*
             long pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
             {
@@ -302,11 +324,11 @@ namespace VMWareHypervisorTunnel.Clients
             });*/
             AwaitProcess(pid);
 
-            var files = fileManager.ListFilesInGuest(_vm, auth, _baseOutputPath, null, null, "output");
+            var files = fileManager.ListFilesInGuest(_vm, auth, _baseOutputPath, null, null, outputFileName);
 
             if (files.Files != null && files.Files.Count() == 1)
             {
-                var output = ReadFile(_vm, auth, _baseOutputPath + "/output");
+                var output = ReadFile(_vm, auth, _baseOutputPath + "/" + outputFileName);
 
                 if (output.Contains('=') && !output.Contains(" "))
                 {
@@ -315,7 +337,7 @@ namespace VMWareHypervisorTunnel.Clients
 
                 //fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
 
-                fileManager.DeleteFileInGuest(_vm, auth, _baseOutputPath + "/output");
+                fileManager.DeleteFileInGuest(_vm, auth, _baseOutputPath + "/" + outputFileName);
 
                 return (output);
             }
@@ -333,12 +355,12 @@ namespace VMWareHypervisorTunnel.Clients
 
             var sshOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
 
-            return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult(); 
+            return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         }
 
-        public string UploadFile(string filePath, byte[] file, string path)
+        public async Task<string> UploadFile(string filePath, byte[] file, string path)
         {
-            System.Diagnostics.Debug.WriteLine("Uploading file");
+            System.Diagnostics.Debug.WriteLine("Uploading file to " + path);
 
             var auth = new NamePasswordAuthentication()
             {
@@ -351,8 +373,17 @@ namespace VMWareHypervisorTunnel.Clients
 
             HttpClient httpClient = new HttpClient();
             ByteArrayContent byteContent = new ByteArrayContent(file);
-            var sshOutput = httpClient.PutAsync(result, byteContent).GetAwaiter().GetResult();
-            return filePath;
+            var sshOutput = await httpClient.PutAsync(result, byteContent);
+            if (sshOutput.IsSuccessStatusCode)
+            {
+                return filePath;
+            }
+            else
+            {
+                var message = (await sshOutput.Content.ReadAsStringAsync());
+                System.Diagnostics.Debug.WriteLine("Failed to upload with error " + message);
+                throw new Exception("Failed to upload file to " + message);
+            }
         }
 
         public void Logout()
