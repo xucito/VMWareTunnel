@@ -14,14 +14,14 @@ namespace CloudOSTunnel.Services
 {
     public class CloudSSHServer
     {
-
         static string clientVersion = "";
         static Dictionary<string, TunnelHandler> channels = new Dictionary<string, TunnelHandler>();
-        private readonly VMWareClient _client;
+        public readonly VMWareClient _client;
         SshServer _server;
         private int _port;
+        public VMWareClient VMWareClient { get { return _client; } }
 
-        public CloudSSHServer(int port)
+        public CloudSSHServer(int port, VMWareClient client)
         {
             _server = new SshServer(new StartingInfo(System.Net.IPAddress.Parse("0.0.0.0"), port, "SSH-2.0-FxSsh"));
             _server.AddHostKey("ssh-rsa", "BwIAAACkAABSU0EyAAQAAAEAAQADKjiW5UyIad8ITutLjcdtejF4wPA1dk1JFHesDMEhU9pGUUs+HPTmSn67ar3UvVj/1t/+YK01FzMtgq4GHKzQHHl2+N+onWK4qbIAMgC6vIcs8u3d38f3NFUfX+lMnngeyxzbYITtDeVVXcLnFd7NgaOcouQyGzYrHBPbyEivswsnqcnF4JpUTln29E1mqt0a49GL8kZtDfNrdRSt/opeexhCuzSjLPuwzTPc6fKgMc6q4MBDBk53vrFY2LtGALrpg3tuydh3RbMLcrVyTNT+7st37goubQ2xWGgkLvo+TZqu3yutxr1oLSaPMSmf9bTACMi5QDicB3CaWNe9eU73MzhXaFLpNpBpLfIuhUaZ3COlMazs7H9LCJMXEL95V6ydnATf7tyO0O+jQp7hgYJdRLR3kNAKT0HU8enE9ZbQEXG88hSCbpf1PvFUytb1QBcotDy6bQ6vTtEAZV+XwnUGwFRexERWuu9XD6eVkYjA4Y3PGtSXbsvhwgH0mTlBOuH4soy8MV4dxGkxM8fIMM0NISTYrPvCeyozSq+NDkekXztFau7zdVEYmhCqIjeMNmRGuiEo8ppJYj4CvR1hc8xScUIw7N4OnLISeAdptm97ADxZqWWFZHno7j7rbNsq5ysdx08OtplghFPx4vNHlS09LwdStumtUel5oIEVMYv+yWBYSPPZBcVY5YFyZFJzd0AOkVtUbEbLuzRs5AtKZG01Ip/8+pZQvJvdbBMLT1BUvHTrccuRbY03SHIaUM3cTUc=");
@@ -29,6 +29,7 @@ namespace CloudOSTunnel.Services
             _server.ConnectionAccepted += server_ConnectionAccepted;
             _server.Start();
             _port = port;
+            _client = client;
         }
 
         public static string GetChannelId(int port, uint channel)
@@ -53,10 +54,13 @@ namespace CloudOSTunnel.Services
                 channels.Remove(deletionKey);
             }
 
+            //Logout from vmware
+            _client.Logout();
+
             //_server.Stop();
         }
 
-        static void server_ConnectionAccepted(object sender, Session e)
+        void server_ConnectionAccepted(object sender, Session e)
         {
             System.Diagnostics.Debug.WriteLine("Accepted a client.");
             int port = ((StartingInfo)Utility.GetValObjDy(sender, "StartingInfo")).Port;
@@ -72,7 +76,7 @@ namespace CloudOSTunnel.Services
             }
         }
 
-        static void e_ServiceRegistered(object sender, SshService e, int port)
+        void e_ServiceRegistered(object sender, SshService e, int port)
         {
             var session = (Session)sender;
             System.Diagnostics.Debug.WriteLine("Session {0} requesting {1}.",
@@ -93,7 +97,7 @@ namespace CloudOSTunnel.Services
             }
         }
 
-        static void service_TcpForwardRequest(object sender, TcpRequestArgs e, int port)
+        void service_TcpForwardRequest(object sender, TcpRequestArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine("Received a request to forward data to {0}:{1}", e.Host, e.Port);
 
@@ -103,7 +107,7 @@ namespace CloudOSTunnel.Services
                 return;
         }
 
-        static void service_PtyReceived(object sender, PtyArgs e, int port)
+        void service_PtyReceived(object sender, PtyArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine("Request to create a PTY received for terminal type {0}", e.Terminal);
 
@@ -113,7 +117,7 @@ namespace CloudOSTunnel.Services
             }
             else
             {
-                channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new CommandHandler("terminal", GlobalTunnelRouter.GetClient(port)));
+                channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new CommandHandler("terminal", _client));
             }
 
             e.Channel.EofReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].Print("Terminal received EOF");
@@ -121,35 +125,35 @@ namespace CloudOSTunnel.Services
             e.Channel.DataReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].Print("Terminal received data");
         }
 
-        static void service_EnvReceived(object sender, EnvironmentArgs e, int port)
+        void service_EnvReceived(object sender, EnvironmentArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine("Received environment variable {0}:{1}", e.Name, e.Value);
         }
 
-        static void service_Userauth(object sender, UserauthArgs e, int port)
+        void service_Userauth(object sender, UserauthArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine("Client {0} fingerprint: {1}.", e.KeyAlgorithm, e.Fingerprint);
 
             e.Result = true;
         }
 
-        static void PrintOutput(string output)
+        void PrintOutput(string output)
         {
             System.Diagnostics.Debug.WriteLine("Foundd output: " + output);
         }
 
-        static void service_CommandOpened(object sender, CommandRequestedArgs e, int port)
+        void service_CommandOpened(object sender, CommandRequestedArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
             if (!channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
                 if (e.CommandText.Split(' ').First() == "scp")
                 {
-                    channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new SCPHandler("scp", GlobalTunnelRouter.GetClient(port)));
+                    channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new SCPHandler("scp", _client));
                 }
                 else
                 {
-                    channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new CommandHandler("", GlobalTunnelRouter.GetClient(port)));
+                    channels.Add(GetChannelId(port, e.Channel.ServerChannelId), new CommandHandler("", _client));
                 }
             }
 

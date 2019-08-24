@@ -17,7 +17,7 @@ namespace CloudOSTunnel.Clients
     {
         private readonly GuestOperationsManager guest;
         private readonly GuestFileManager fileManager;
-        private readonly GuestProcessManager processManager;
+        private GuestProcessManager processManager;
         private readonly string _serviceUrl = "";
         private readonly string _vCenterUsername = "";
         private readonly string _vCenterPassword = "";
@@ -38,13 +38,8 @@ namespace CloudOSTunnel.Clients
 
         public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref, string vmUsername = null, string vmPassord = null)
         {
-            ServicePointManager
-                .ServerCertificateValidationCallback +=
-                (sender, cert, chain, sslPolicyErrors) => true;
-
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-
             client = new VimClientImpl();
+            client.IgnoreServerCertificateErrors = true;
             client.Connect(serviceUrl);
 
             var session = client.Login(vcenterUsername, vcenterPassword);
@@ -119,14 +114,9 @@ namespace CloudOSTunnel.Clients
 
         public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string moref, string vmUsername = null, string vmPassord = null)
         {
-            ServicePointManager
-                .ServerCertificateValidationCallback +=
-                (sender, cert, chain, sslPolicyErrors) => true;
-
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-
 
             client = new VimClientImpl();
+            client.IgnoreServerCertificateErrors = true;
             client.Connect(serviceUrl);
 
             var session = client.Login(vcenterUsername, vcenterPassword);
@@ -177,7 +167,7 @@ namespace CloudOSTunnel.Clients
 
         public string GetHostName()
         {
-            return ExecuteCommand("hostname");
+            return ExecuteCommand("hostname", out _, out _);
         }
 
         public string RandomString(int size, bool lowerCase)
@@ -250,7 +240,7 @@ namespace CloudOSTunnel.Clients
             return true;
         }
 
-        public string ExecuteCommand(string command, string commandUniqueIdentifier = null)
+        public string ExecuteCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
         {
             if (commandUniqueIdentifier == null)
             {
@@ -267,22 +257,23 @@ namespace CloudOSTunnel.Clients
             };
 
             var sshCommand = command;
-            long pid;
-            var fullCommand = "/usr/bin/ssh" + " -i " + PrivateFileLocation + " -o StrictHostKeyChecking=no " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"").Replace("\'", "\\\'") + ")\" &> " + _baseOutputPath + "/" + outputFileName;
+
+            var fullCommand = "/usr/bin/ssh" + " -i " + PrivateFileLocation + " -o StrictHostKeyChecking=no  -t -t  " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"").Replace("\'", "\\\'") + ")\" &> " + _baseOutputPath + "/" + outputFileName;
             System.Diagnostics.Debug.WriteLine("Full command path:  " + fullCommand);
 
+            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
             //  if (command.Split(' ')[0] != "/bin/sh")
             // {
             pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
             {
                 ProgramPath = "/usr/bin/ssh",
-                Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"") + ")\" &> " + _baseOutputPath + "/" + outputFileName,//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
+                Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"") + ")\" > " + _baseOutputPath + "/" + outputFileName + " 2>&1",//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
                 WorkingDirectory = "/tmp"
             });
 
-            Thread.Sleep(1000);
+            // Thread.Sleep(1000);
 
-            AwaitProcess(pid);
+            isComplete = AwaitProcess(pid);
 
             var files = fileManager.ListFilesInGuest(_vm, auth, _baseOutputPath, null, null, outputFileName);
 
@@ -294,6 +285,8 @@ namespace CloudOSTunnel.Clients
                 {
                     output = output.Split('=').Last();
                 }
+
+                //fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
 
                 fileManager.DeleteFileInGuest(_vm, auth, _baseOutputPath + "/" + outputFileName);
 
@@ -307,13 +300,20 @@ namespace CloudOSTunnel.Clients
 
         private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string filePath)
         {
+
             var result = fileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
 
-            HttpClient httpClient = new HttpClient();
+            using (var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
+            })
+            {
+                HttpClient httpClient = new HttpClient(handler);
 
-            var sshOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
+                var sshOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
 
-            return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            }
         }
 
         public async Task<string> UploadFile(string filePath, byte[] file, string path)
@@ -328,19 +328,24 @@ namespace CloudOSTunnel.Clients
             };
 
             var result = fileManager.InitiateFileTransferToGuest(_vm, auth, path, new GuestFileAttributes() { }, file.LongLength, true);
-
-            HttpClient httpClient = new HttpClient();
-            ByteArrayContent byteContent = new ByteArrayContent(file);
-            var sshOutput = await httpClient.PutAsync(result, byteContent);
-            if (sshOutput.IsSuccessStatusCode)
+            using (var handler = new HttpClientHandler
             {
-                return filePath;
-            }
-            else
+                ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
+            })
             {
-                var message = (await sshOutput.Content.ReadAsStringAsync());
-                System.Diagnostics.Debug.WriteLine("Failed to upload with error " + message);
-                throw new Exception("Failed to upload file to " + message);
+                HttpClient httpClient = new HttpClient(handler);
+                ByteArrayContent byteContent = new ByteArrayContent(file);
+                var sshOutput = await httpClient.PutAsync(result, byteContent);
+                if (sshOutput.IsSuccessStatusCode)
+                {
+                    return filePath;
+                }
+                else
+                {
+                    var message = (await sshOutput.Content.ReadAsStringAsync());
+                    System.Diagnostics.Debug.WriteLine("Failed to upload with error " + message);
+                    throw new Exception("Failed to upload file to " + message);
+                }
             }
         }
 
@@ -352,9 +357,16 @@ namespace CloudOSTunnel.Clients
                 Password = _vmRootPassword,
                 InteractiveSession = false
             };
+            try
+            {
 
-            fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
-            client.Logout();
+                fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
+                client.Logout();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Failed to end session correctly, check " + _vm.Value + " at directory "  + _baseOutputPath);
+            }
         }
     }
 }

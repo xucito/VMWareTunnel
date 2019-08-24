@@ -4,11 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CloudOSTunnel.Services.Handlers
 {
-    public class CommandHandler: TunnelHandler
+    public class CommandHandler : TunnelHandler
     {
         string consoleOutput = "";
         object _sender;
@@ -31,6 +32,8 @@ namespace CloudOSTunnel.Services.Handlers
 
         public List<byte> cachedFile = new List<byte>();
         public List<byte> currentCommand = new List<byte>();
+        public bool PipeToExistingProcess = false;
+        public long PID;
 
         public override void OnData(byte[] data, string type = "")
         {
@@ -60,11 +63,14 @@ namespace CloudOSTunnel.Services.Handlers
             }
             else
             {
-                var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data));
+                //used to allow contiued communication
+                bool isComplete = false;
+                var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
                 result = result.Replace("Connection to 127.0.0.1 closed.", "");
                 result = result.Trim(new char[] { '\n', '\r' });
                 System.Diagnostics.Debug.WriteLine("Got result: " + result);
                 DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
+                Thread.Sleep(1000);
                 EofReceived?.Invoke(this, EventArgs.Empty);
                 CloseReceived?.Invoke(this, 0);
             }
