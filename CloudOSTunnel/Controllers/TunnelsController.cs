@@ -30,11 +30,11 @@ namespace CloudOSTunnel.Controllers
 
             foreach (var port in ports)
             {
-                var client = _router.GetSSHServer(port)?.VMWareClient;
+                var client = _router.GetServer(port);
                 tunnelDict.Add(port, new TunnelVM()
                 {
-                    HostName = client != null ? client.HostName : "",
-                    MoRef = client != null ? client.MoRef : "",
+                    HostName = client != null ? client.Hostname : "",
+                    Reference = client != null ? client.Reference : "",
                     Port = port,
                     Connected = client != null ? true : false
                 });
@@ -53,7 +53,7 @@ namespace CloudOSTunnel.Controllers
             return Ok(new
             {
                 Port = port,
-                Hostname = _router.GetSSHServer(port).VMWareClient.HostName
+                Hostname = _router.GetServer(port).Hostname
             });
         }
 
@@ -61,6 +61,11 @@ namespace CloudOSTunnel.Controllers
         [HttpPost]
         public IActionResult Post([FromBody]PostTunnelRequestVM value)
         {
+            if(!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 var stopwatch = new Stopwatch();
@@ -69,29 +74,41 @@ namespace CloudOSTunnel.Controllers
                 
                 if ((value.VMName != "" && value.VMName != null))
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.VMRootUsername, value.VMRootPassword, value.VMName, value.MoRef, value.VMExecutingUsername, value.VMExecutingPassword);
+                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
                 }
                 else if (value.MoRef != "" && value.MoRef != null)
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.VMRootUsername, value.VMRootPassword, value.MoRef, value.VMExecutingUsername, value.VMExecutingPassword);
+                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
                 }
                 else
                 {
                     return BadRequest("Please specify moref, name or both.");
                 }
-                
 
-                return Ok(new
+                //Determine which client to use
+
+                //if linux
+                if (!client.GuestFamily.ToLower().Contains("window"))
                 {
-                    Port = _router.InitializeTunnel(client),
-                    MoRef = client.MoRef,
-                    Hostname = client.HostName,
-                    ElapsedMs = stopwatch.ElapsedMilliseconds,
-                    TempFilesPath = client.TempPath,
-                    PublicKey = client.PublicKey,
-                    PrivateKeyLocation = client.PrivateFileLocation,
-                    FullVMName = client.FullVMName
-                });
+                    var server = new CloudSSHServer(client);
+                    return Ok(new
+                    {
+                        Port = _router.InitializeTunnel(server),
+                        MoRef = client.MoRef,
+                        Hostname = client.HostName,
+                        ElapsedMs = stopwatch.ElapsedMilliseconds,
+                        TempFilesPath = client.TempPath,
+                        PublicKey = client.PublicKey,
+                        PrivateKeyLocation = client.PrivateFileLocation,
+                        FullVMName = client.FullVMName
+                    });
+                }
+                //Assume windows
+                else
+                {
+                    // Implement windows here
+                    return BadRequest("WINDOWS HAS NOT BEEN IMPLEMENTED");
+                }
             }
             catch (Exception e)
             {
@@ -120,7 +137,7 @@ namespace CloudOSTunnel.Controllers
         [HttpDelete("{port}")]
         public void Delete(int port)
         {
-            if (_router.GetSSHServer(port) != null)
+            if (_router.GetServer(port) != null)
                 _router.DisconnectClient(port);
         }
     }

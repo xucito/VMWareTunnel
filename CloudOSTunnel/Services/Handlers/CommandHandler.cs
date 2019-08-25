@@ -67,12 +67,13 @@ namespace CloudOSTunnel.Services.Handlers
                 bool isComplete = false;
                 var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
                 result = result.Replace("Connection to 127.0.0.1 closed.", "");
-                result = result.Trim(new char[] { '\n', '\r' });
+                //result = result.Trim(new char[] { '\n', '\r' });
+                //result = result.Replace("This system is  property of Etisalat, and it must  be used", "");
                 System.Diagnostics.Debug.WriteLine("Got result: " + result);
                 DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
-                Thread.Sleep(1000);
                 EofReceived?.Invoke(this, EventArgs.Empty);
-                CloseReceived?.Invoke(this, 0);
+                if (isComplete)
+                    CloseReceived?.Invoke(this, 0);
             }
             return;
         }

@@ -15,7 +15,7 @@ namespace CloudOSTunnel.Services
         };
 
         //private Dictionary<int, VMWareClient> ConnectedClients = new Dictionary<int, VMWareClient>();
-        private Dictionary<int, CloudSSHServer> HostedServers = new Dictionary<int, CloudSSHServer>();
+        private Dictionary<int, ITunnel> HostedServers = new Dictionary<int, ITunnel>();
         static readonly object _locker = new object();
 
         public GlobalTunnelRouter()
@@ -23,7 +23,8 @@ namespace CloudOSTunnel.Services
 
         }
 
-        public int InitializeTunnel(VMWareClient client)
+        public int InitializeTunnel<T>(T tunnel) where
+            T : ITunnel
         {
             lock (_locker)
             {
@@ -31,16 +32,17 @@ namespace CloudOSTunnel.Services
                 {
                     //if (!ConnectedClients.ContainsKey(port))
                     //{
-                       // ConnectedClients.Add(port, client);
-                        HostedServers.Add(port, new CloudSSHServer(port, client));
-                        return port;
-                  //  }
+                    // ConnectedClients.Add(port, client);
+                    HostedServers.Add(port, tunnel);
+                    tunnel.StartListening(port);
+                    return port;
+                    //  }
                 }
                 throw new Exception("No available ports.");
             }
         }
 
-        public CloudSSHServer GetSSHServer(int port)
+        public ITunnel GetServer(int port)
         {
             if (HostedServers.ContainsKey(port))
             {

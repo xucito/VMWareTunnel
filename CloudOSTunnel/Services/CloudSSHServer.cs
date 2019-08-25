@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace CloudOSTunnel.Services
 {
-    public class CloudSSHServer
+    public class CloudSSHServer: ITunnel
     {
         static string clientVersion = "";
         static Dictionary<string, TunnelHandler> channels = new Dictionary<string, TunnelHandler>();
@@ -20,8 +20,15 @@ namespace CloudOSTunnel.Services
         SshServer _server;
         private int _port;
         public VMWareClient VMWareClient { get { return _client; } }
+        public string Hostname { get { return _client.HostName; } }
+        public string Reference { get { return _client.MoRef; } }
 
-        public CloudSSHServer(int port, VMWareClient client)
+        public CloudSSHServer(VMWareClient client)
+        { 
+            _client = client;
+        }
+
+        public void StartListening(int port)
         {
             _server = new SshServer(new StartingInfo(System.Net.IPAddress.Parse("0.0.0.0"), port, "SSH-2.0-FxSsh"));
             _server.AddHostKey("ssh-rsa", "BwIAAACkAABSU0EyAAQAAAEAAQADKjiW5UyIad8ITutLjcdtejF4wPA1dk1JFHesDMEhU9pGUUs+HPTmSn67ar3UvVj/1t/+YK01FzMtgq4GHKzQHHl2+N+onWK4qbIAMgC6vIcs8u3d38f3NFUfX+lMnngeyxzbYITtDeVVXcLnFd7NgaOcouQyGzYrHBPbyEivswsnqcnF4JpUTln29E1mqt0a49GL8kZtDfNrdRSt/opeexhCuzSjLPuwzTPc6fKgMc6q4MBDBk53vrFY2LtGALrpg3tuydh3RbMLcrVyTNT+7st37goubQ2xWGgkLvo+TZqu3yutxr1oLSaPMSmf9bTACMi5QDicB3CaWNe9eU73MzhXaFLpNpBpLfIuhUaZ3COlMazs7H9LCJMXEL95V6ydnATf7tyO0O+jQp7hgYJdRLR3kNAKT0HU8enE9ZbQEXG88hSCbpf1PvFUytb1QBcotDy6bQ6vTtEAZV+XwnUGwFRexERWuu9XD6eVkYjA4Y3PGtSXbsvhwgH0mTlBOuH4soy8MV4dxGkxM8fIMM0NISTYrPvCeyozSq+NDkekXztFau7zdVEYmhCqIjeMNmRGuiEo8ppJYj4CvR1hc8xScUIw7N4OnLISeAdptm97ADxZqWWFZHno7j7rbNsq5ysdx08OtplghFPx4vNHlS09LwdStumtUel5oIEVMYv+yWBYSPPZBcVY5YFyZFJzd0AOkVtUbEbLuzRs5AtKZG01Ip/8+pZQvJvdbBMLT1BUvHTrccuRbY03SHIaUM3cTUc=");
@@ -29,7 +36,6 @@ namespace CloudOSTunnel.Services
             _server.ConnectionAccepted += server_ConnectionAccepted;
             _server.Start();
             _port = port;
-            _client = client;
         }
 
         public static string GetChannelId(int port, uint channel)

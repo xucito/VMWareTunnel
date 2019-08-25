@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Web;
 
@@ -9,12 +10,15 @@ namespace CloudOSTunnel.ViewModels
     {
         public string VMName { get; set; }
         public string MoRef { get; set; }
+        [Required]
         public string ServiceUrl { get; set; }
+        [Required]
         public string VCenterUsername { get; set; }
+        [Required]
         public string VCenterPassword { get; set; }
-        public string VMRootUsername { get; set; }
-        public string VMRootPassword { get; set; }
-        public string VMExecutingUsername { get; set; }
-        public string VMExecutingPassword { get; set; }
+        [Required]
+        public string OSUsername { get; set; }
+        [Required]
+        public string OSPassword { get; set; }
     }
 }

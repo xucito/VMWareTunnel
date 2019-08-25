@@ -9,7 +9,7 @@ namespace CloudOSTunnel.ViewModels
     {
         public int Port { get; set; }
         public string HostName { get; set; }
-        public string MoRef { get; set; }
+        public string Reference { get; set; }
         public bool Connected { get; set; }
     }
 }

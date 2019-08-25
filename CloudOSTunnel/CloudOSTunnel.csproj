@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="enums\" />
     <Folder Include="ViewModels\" />
   </ItemGroup>
 
