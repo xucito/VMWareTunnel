@@ -13,7 +13,7 @@ namespace CloudOSTunnel.Services
     {
         private IWebHost host;
 
-        public WSManServer(int port, bool useSsl)
+        public WSManServer(VMWareClient client)
         {
         }
 
