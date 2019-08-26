@@ -9,37 +9,49 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using Microsoft.Extensions.Logging;
 using VMware.Vim;
+using CloudOSTunnel.Services.WSMan;
 
 namespace CloudOSTunnel.Clients
 {
-    public class VMWareClient
+    public partial class VMWareClient : IDisposable, IWSManLogging
     {
+        #region vCenter Attributes
         private readonly GuestOperationsManager guest;
         private readonly GuestFileManager fileManager;
         private GuestProcessManager processManager;
-        private readonly string _serviceUrl = "";
-        private readonly string _vCenterUsername = "";
-        private readonly string _vCenterPassword = "";
         private ManagedObjectReference _vm;
         private NamePasswordAuthentication _executingCredentials;
         private VimClientImpl client;
-        public readonly string HostName;
-        public readonly string MoRef;
-        private string _baseOutputPath = "/tmp/vmwaretunnel-";
+        private readonly string _serviceUrl = "";
+        private readonly string _vCenterUsername = "";
+        private readonly string _vCenterPassword = "";
         public string SessionId { get; set; }
+        public string FullVMName { get; set; }
+        public readonly string MoRef;
+        #endregion vCenter Attributes
+
+        #region Guest Attributes
+        public readonly string HostName;
+        public string GuestFamily { get; }
+        public string GuestFullName { get; }
+        #endregion Guest Attributes
+
+        #region Linux Variables
+        public string EntryMessage { get; set; }
+        private string _baseOutputPath = "/tmp/vmwaretunnel-";
+        public int SSHMessageCount = 0;
         public string TempPath { get { return _baseOutputPath; } }
         public bool ExecuteAsRoot { get; set; }
         public string PrivateFileLocation;
         public string PublicKey;
-        public string FullVMName { get; set; }
-        public string EntryMessage { get; set; }
-        public int SSHMessageCount = 0;
-        public string GuestFamily { get; }
-        public string GuestFullName { get; }
+        #endregion Linux Variables
 
-        public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref)
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
+            this.logger = loggerFactory.CreateLogger<VMWareClient>();
+
             client = new VimClientImpl();
             client.IgnoreServerCertificateErrors = true;
             client.Connect(serviceUrl);
