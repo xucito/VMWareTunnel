@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.IO;
 using System.Text;
 using System.Xml;
 using System.Net;
@@ -10,12 +9,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Http;
+
 using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
-    public class WSManServer : ITunnel, IDisposable, IWSManLogging
+    public class WSManServer : ITunnel, IWSManLogging, IDisposable
     {
         #region Configuration
         private const bool useSsl = true;
@@ -27,10 +26,7 @@ namespace CloudOSTunnel.Services.WSMan
         public VMWareClient Client { get; private set; }
 
         // WSMan runtime dictionary: command id as key
-        private Dictionary<string, WSManRuntime> runtimes;
-        // Used to validate web request credential header
-        private readonly string vmAuthCode;
-
+        private Dictionary<string, WSManServerRuntime> runtimes;
         // Signal stopped server (used by WsmanServerManager for cleanup)
         public bool IsStopped { get; private set; }
 
@@ -76,8 +72,9 @@ namespace CloudOSTunnel.Services.WSMan
             this.host = new WebHostBuilder()
                 .ConfigureServices(services =>
                 {
-                    // Inject WSManServer object
-                    services.Add(ServiceDescriptor.Singleton(typeof(WSManServer), this));
+                    // Inject WSManHandler object for web host to use
+                    services.AddSingleton(
+                        new WSManHandler(loggerFactory, this, proto, port, Client.VmUser, Client.VmPassword));
                 })
                 .UseKestrel(options =>
                 {
@@ -118,18 +115,7 @@ namespace CloudOSTunnel.Services.WSMan
             this.debug = debug;
 
             this.IsStopped = false;
-            this.vmAuthCode = Convert.ToBase64String(Encoding.UTF8.GetBytes(client.VmUser + ":" + client.VmPassword));
-            this.runtimes = new Dictionary<string, WSManRuntime>();
-        }
-
-        /// <summary>
-        /// Validate guest credential by comparing the Base64 encdoed username and password  
-        /// </summary>
-        /// <param name="authCode">Base64 encoded authorization code</param>
-        /// <returns></returns>
-        private bool ValidateGuestCredential(string authCode)
-        {
-            return authCode == this.vmAuthCode;
+            this.runtimes = new Dictionary<string, WSManServerRuntime>();
         }
 
         #region Logging
@@ -161,55 +147,6 @@ namespace CloudOSTunnel.Services.WSMan
         #endregion Logging
 
         /// <summary>
-        /// Handle web request
-        /// </summary>
-        /// <param name="context">HttpContext</param>
-        /// <returns>Async task</returns>
-        public async Task HandleRequest(HttpContext context)
-        {
-            try
-            {
-                var request = context.Request;
-                var response = context.Response;
-                var body = "";
-
-                // Read request as string
-                using (StreamReader reader = new StreamReader(request.Body, Encoding.UTF8, true))
-                {
-                    body = reader.ReadToEnd();
-                }
-
-                // Convert request to xml
-                var xml = new XmlDocument();
-                xml.LoadXml(body);
-
-                // Authorization: Basic XXXXXXXXXXXXXXXXXXXX
-                var authType = request.Headers["Authorization"].First().Split(" ")[0];
-                var authCode = request.Headers["Authorization"].First().Split(" ")[1];
-                if (authType == "Basic" && ValidateGuestCredential(authCode))
-                {
-                    var xmlResponse = await HandleWsman(xml);
-                    if (xmlResponse != null)
-                    {
-                        response.ContentType = "application/soap+xml;charset=UTF-8";
-                        response.StatusCode = (int)HttpStatusCode.OK;
-                        await response.WriteAsync(xmlResponse, Encoding.UTF8);
-                    }
-                }
-                else
-                {
-                    response.StatusCode = (int)HttpStatusCode.Unauthorized;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError(string.Format("Exception while handing request: {0}", ex));
-                LogError("Stopping server for safety");
-                Shutdown();
-            }
-        }
-
-        /// <summary>
         /// Handle Wsman protocol request 
         /// </summary>
         /// <param name="xml">XML request</param>
@@ -223,13 +160,13 @@ namespace CloudOSTunnel.Services.WSMan
 
             if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create")
             {
-                response = WSManRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
+                response = WSManServerRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command")
             {
                 // Generate a command id and create runtime
                 string commandId = "" + Guid.NewGuid();
-                var wsmanRuntime = new WSManRuntime(loggerFactory, Client, commandId, Id);
+                var wsmanRuntime = new WSManServerRuntime(loggerFactory, Client, commandId, Id);
                 runtimes.Add(commandId, wsmanRuntime);
 
                 response = wsmanRuntime.HandleExecuteCommandAction(xml);
@@ -248,12 +185,12 @@ namespace CloudOSTunnel.Services.WSMan
             {
                 string commandId = xml.GetElementsByTagName("rsp:Signal").Item(0).Attributes["CommandId"].Value;
                 // Delete runtime for the command id
+                response = runtimes[commandId].HandleSignalAction(xml);
                 runtimes.Remove(commandId);
-                response = WSManRuntime.HandleSignalAction(xml, this);
             }
             else if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete")
             {
-                response = WSManRuntime.HandleDeleteShellAction(xml, this);
+                response = WSManServerRuntime.HandleDeleteShellAction(xml, this);
             }
             else
             {

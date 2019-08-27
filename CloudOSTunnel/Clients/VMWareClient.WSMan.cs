@@ -90,8 +90,10 @@ namespace CloudOSTunnel.Clients
 
             using (FileStream fs = new FileStream(serverPath, FileMode.Open, FileAccess.Read))
             {
-                var fileTransferRef = fileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, guestPath,
-                    new GuestFileAttributes() { }, fs.Length, true);
+                var fileTransferRef = fileManager.InitiateFileTransferToGuest(_vm, 
+                    _executingCredentials, guestPath,
+                    new GuestFileAttributes() { }, 
+                    fs.Length, true);
                 using (var handler = new HttpClientHandler
                 {
                     ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
@@ -102,10 +104,12 @@ namespace CloudOSTunnel.Clients
                     int remainingBytesToRead = (int)fs.Length;
                     while (remainingBytesToRead > 0)
                     {
+                        // Read up to buffer size
                         int bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
                         if (bytesRead == 0)
                             break;
 
+                        // Upload a file chunk stored in buffer
                         ByteArrayContent byteContent = new ByteArrayContent(buffer, 0, bytesRead);
                         var uploadResponse = await httpClient.PutAsync(fileTransferRef, byteContent);
                         if (!uploadResponse.IsSuccessStatusCode)
@@ -276,8 +280,8 @@ namespace CloudOSTunnel.Clients
                 {
                     // Further examine encoded commands when needed
                     // win_reboot that contains Restart-Computer/shutdown must run async because it will lose contact with guest agent
-                    string innerEncodedCommand = WSManRuntime.GetCommandInput(command, "-EncodedCommand");
-                    string innerDecodedCommand = WSManRuntime.DecodeCommand(innerEncodedCommand, WSManRuntime.CommandType.InvokeCommand);
+                    string innerEncodedCommand = WSManServerRuntime.GetCommandInput(command, "-EncodedCommand");
+                    string innerDecodedCommand = WSManServerRuntime.DecodeCommand(innerEncodedCommand, WSManServerRuntime.CommandType.InvokeCommand);
 
                     LogInformation("InnerDecodedCommand: " + innerDecodedCommand);
 

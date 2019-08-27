@@ -14,8 +14,6 @@ namespace CloudOSTunnel.Services.WSMan
 {
     public class WSManStartup
     {
-        private WSManServer wsman;
-
         public WSManStartup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -30,10 +28,8 @@ namespace CloudOSTunnel.Services.WSMan
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, WSManServer wsman)
+        public void Configure(IApplicationBuilder app, IHostingEnvironment env, WSManHandler wsmanHandler)
         {
-            this.wsman = wsman;
-
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -46,7 +42,7 @@ namespace CloudOSTunnel.Services.WSMan
 
             app.UseHttpsRedirection();
             app.UseMvc();
-            app.Run(wsman.HandleRequest);
+            app.Run(wsmanHandler.HandleRequest);
             /* app.Run(async context =>
             {
                 await context.Response.WriteAsync("Hello, World!");
