@@ -201,6 +201,7 @@ namespace CloudOSTunnel.Clients
             string stdoutPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stdout.txt");
             string stderrPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stderr.txt");
 
+            // To support script block, -Command must be in the format of: -Command "& {command}"
             string invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{{0}}}"" 1>{1} 2>{2}",
                 command, stdoutPathGuest, stderrPathGuest);
             LogInformation(invoker);
@@ -303,7 +304,7 @@ namespace CloudOSTunnel.Clients
                     if (!base64Payload)
                     {
                         // Single command e.g. (Get-WmiObject -ClassName Win32_OperatingSystem).LastBootUpTime
-                        invoker = string.Format("PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command {{{0}}} 1>{1} 2>{2}",
+                        invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{{0}}}"" 1>{1} 2>{2}",
                             command, stdoutPathGuest, stderrPathGuest);
                     }
                     else
@@ -323,7 +324,7 @@ namespace CloudOSTunnel.Clients
 
                     // Command: PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -EncodedCommand XXX
                     // Note: -NoProfile must be used in the out-most PowerShell
-                    invoker = string.Format("PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command {{ Get-Content {0} | {1} 1>{2} 2>{3} }}",
+                    invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{ Get-Content {0} | {1} 1>{2} 2>{3} }}""",
                         payloadPathGuest, command, stdoutPathGuest, stderrPathGuest);
                 }
                 else if (command.StartsWith("begin", StringComparison.OrdinalIgnoreCase))
@@ -339,7 +340,7 @@ namespace CloudOSTunnel.Clients
                         await UploadFile(payloadPathOnServer, payloadPathGuest);
                         // Call command script file, then pipe payload into it
                         // Note: -NoProfile must be used in the out-most PowerShell
-                        invoker = string.Format("PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command {{ Get-Content {0} | {1} 1>{2} 2>{3} }}",
+                        invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{ Get-Content {0} | {1} 1>{2} 2>{3} }}""",
                             payloadPathGuest, cmdPathGuest, stdoutPathGuest, stderrPathGuest);
                     }
                     else

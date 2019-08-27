@@ -11,7 +11,13 @@ namespace CloudOSTunnel.Services
         public static int[] AllowedPorts = new int[] {
             5002,
             5003,
-            5004
+            5004,
+            5005,
+            5006,
+            5007,
+            5008,
+            5009,
+            5010
         };
 
         //private Dictionary<int, VMWareClient> ConnectedClients = new Dictionary<int, VMWareClient>();
