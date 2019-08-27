@@ -133,6 +133,12 @@ namespace CloudOSTunnel.Clients
             return string.Format("{0}_{1}", vmPrefix, commandId);
         }
 
+        /// <summary>
+        /// Await process and output exit code
+        /// </summary>
+        /// <param name="pid"></param>
+        /// <param name="exitCode"></param>
+        /// <returns></returns>
         public bool AwaitProcess(long pid, out int exitCode)
         {
             GuestProcessInfo[] process;
@@ -147,6 +153,12 @@ namespace CloudOSTunnel.Clients
             return true;
         }
 
+        /// <summary>
+        /// Invoke windows guest command and specify whether the need to wait for completion
+        /// </summary>
+        /// <param name="command"></param>
+        /// <param name="wait"></param>
+        /// <returns></returns>
         public int InvokeWindowsGuestCommand(string command, bool wait)
         {
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
