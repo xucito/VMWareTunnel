@@ -102,7 +102,7 @@ namespace CloudOSTunnel.Clients
                     int remainingBytesToRead = (int)fs.Length;
                     while (remainingBytesToRead > 0)
                     {
-                        int bytesRead = await fs.ReadAsync(buffer, 0, remainingBytesToRead);
+                        int bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
                         if (bytesRead == 0)
                             break;
 
