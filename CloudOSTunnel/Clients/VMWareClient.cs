@@ -49,8 +49,9 @@ namespace CloudOSTunnel.Clients
         #endregion Linux Variables
 
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
-            string vmRootUsername, string vmRootPassword, string vmName, string moref)
+            string vmRootUsername, string vmRootPassword, string vmName, string moref, bool debug)
         {
+            this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
 
             client = new VimClientImpl();
@@ -99,9 +100,6 @@ namespace CloudOSTunnel.Clients
             fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
-            SessionId = RandomString(6, true);
-            _baseOutputPath = _baseOutputPath + SessionId;
-
             _executingCredentials = new NamePasswordAuthentication()
             {
                 Username = vmRootUsername,
@@ -110,6 +108,9 @@ namespace CloudOSTunnel.Clients
 
             if (!GuestFamily.ToLower().Contains("window"))
             {
+                SessionId = RandomString(6, true);
+                _baseOutputPath = _baseOutputPath + SessionId;
+
                 ExecuteAsRoot = true;
 
                 SetupKey();
@@ -128,8 +129,9 @@ namespace CloudOSTunnel.Clients
         }
 
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
-            string vmUsername, string vmPassword, string moref)
+            string vmUsername, string vmPassword, string moref, bool debug)
         {
+            this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
 
             client = new VimClientImpl();
@@ -155,9 +157,6 @@ namespace CloudOSTunnel.Clients
             fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
-            SessionId = RandomString(6, true);
-            _baseOutputPath = _baseOutputPath + SessionId;
-
             _executingCredentials = new NamePasswordAuthentication()
             {
                 Username = vmUsername,
@@ -166,6 +165,9 @@ namespace CloudOSTunnel.Clients
 
             if (!GuestFamily.ToLower().Contains("window"))
             {
+                SessionId = RandomString(6, true);
+                _baseOutputPath = _baseOutputPath + SessionId;
+
                 ExecuteAsRoot = vmUsername == null ? true : false;
 
                 SetupKey();

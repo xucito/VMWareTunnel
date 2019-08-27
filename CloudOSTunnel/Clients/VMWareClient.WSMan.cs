@@ -16,7 +16,7 @@ namespace CloudOSTunnel.Clients
         private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 60;
         private const int GUEST_OPERATIONS_MAX_RETRIES = 3;
         private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
-        private readonly bool debugWsman;
+        private readonly bool debug;
 
         // Root path in Windows guest (to store temporal files)
         private const string windowsGuestRoot = @"C:\Users\Public\Documents";
@@ -305,7 +305,7 @@ namespace CloudOSTunnel.Clients
             }
 
             // Save invoker for debug mode only
-            if (debugWsman)
+            if (debug)
             {
                 await UploadFile(invoker, invokerPathServer, invokerPathGuest);
             }

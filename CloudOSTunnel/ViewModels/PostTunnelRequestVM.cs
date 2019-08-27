@@ -20,5 +20,6 @@ namespace CloudOSTunnel.ViewModels
         public string OSUsername { get; set; }
         [Required]
         public string OSPassword { get; set; }
+        public bool Debug { get; set; }
     }
 }
