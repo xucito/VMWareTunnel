@@ -200,9 +200,10 @@ namespace CloudOSTunnel.Clients
             }
 
             int exitCode;
+            bool hasOutput;
+            string stdout, stderr;
             string invoker;
             bool isReboot = false;
-            bool hasOutput;
 
             string filePrefix = GetWsmanFilePrefix(commandId);
 
@@ -313,7 +314,6 @@ namespace CloudOSTunnel.Clients
             LogInformation(invoker);
 
             // Invoke and get output
-            string stdout, stderr;
             if (isReboot)
             {
                 // Reboot must not wait because guest agent will lose contact. This expects 0 exit code
