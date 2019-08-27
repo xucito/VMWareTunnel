@@ -319,7 +319,7 @@ namespace CloudOSTunnel.Services.WSMan
             string stdinCommand = DecodeCommand(encodedCommand, CommandType.StdinCommand);
 
             LogInformation(string.Format("Received stdin command {0} chars", stdinCommand.Length));
-            LogDebug(stdinCommand);
+            //LogDebug(stdinCommand);
 
             // Payload is encoded in base64 if it has no space in first 32 chars
             payloadEncoded = !stdinCommand.Take(32).Contains(' ');
