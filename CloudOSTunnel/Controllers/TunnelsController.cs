@@ -17,10 +17,12 @@ namespace CloudOSTunnel.Controllers
     [Route("api/[controller]")]
     public class TunnelsController : Controller
     {
+        private ILoggerFactory loggerFactory;
         GlobalTunnelRouter _router;
-        public TunnelsController(GlobalTunnelRouter router)
+        public TunnelsController(ILoggerFactory loggerFactory, GlobalTunnelRouter router)
         {
-            _router = router;
+            this.loggerFactory = loggerFactory;
+            this._router = router;
         }
 
         [HttpGet]
@@ -61,7 +63,7 @@ namespace CloudOSTunnel.Controllers
 
         // POST api/<controller>
         [HttpPost]
-        public IActionResult Post([FromBody]PostTunnelRequestVM value, ILoggerFactory loggerFactory)
+        public IActionResult Post([FromBody]PostTunnelRequestVM value)
         {
             if(!ModelState.IsValid)
             {

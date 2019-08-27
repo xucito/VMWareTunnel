@@ -53,6 +53,7 @@ namespace CloudOSTunnel.Clients
         {
             this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
+            this._serviceUrl = serviceUrl;
 
             client = new VimClientImpl();
             client.IgnoreServerCertificateErrors = true;
@@ -133,6 +134,7 @@ namespace CloudOSTunnel.Clients
         {
             this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
+            this._serviceUrl = serviceUrl;
 
             client = new VimClientImpl();
             client.IgnoreServerCertificateErrors = true;

@@ -166,11 +166,13 @@ namespace CloudOSTunnel.Clients
         private int InvokeWindowsGuestCommand(string command, bool wait)
         {
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-
+            var split = command.Split(" ");
+            string program = split[0];
+            string arguments = string.Join(" ", split.Skip(1));
             long pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
-                ProgramPath = "cmd.exe",
-                Arguments = string.Format(" /C {0}", command),
+                ProgramPath = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+                Arguments = arguments,
                 WorkingDirectory = windowsGuestRoot
             });
 
@@ -199,8 +201,9 @@ namespace CloudOSTunnel.Clients
             string stdoutPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stdout.txt");
             string stderrPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stderr.txt");
 
-            string invoker = string.Format("PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command {{{0}}} 1>{1} 2>{2}",
+            string invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{{0}}}"" 1>{1} 2>{2}",
                 command, stdoutPathGuest, stderrPathGuest);
+            LogInformation(invoker);
             int exitCode = InvokeWindowsGuestCommand(invoker, true);
             LogInformation("Getting output and error from guest");
             string stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
