@@ -17,12 +17,17 @@ namespace CloudOSTunnel.Services.WSMan
 {
     public class WSManServer : ITunnel, IDisposable, IWSManLogging
     {
-        // Shared client to access vCenter
+        #region Configuration
+        private const bool useSsl = true;
+        private const string certPath = "Certificates/CloudOSTunnel.pfx";
+        private const string certPassword = "CloudOSTunnel";
+        #endregion Configuration
+
+        // VMware client to access vCenter
         public VMWareClient Client { get; private set; }
 
+        // WSMan runtime dictionary: command id as key
         private Dictionary<string, WSManRuntime> runtimes;
-        // Used only when assigning shell id
-        private readonly string vmUser;
         // Used to validate web request credential header
         private readonly string vmAuthCode;
 
@@ -31,23 +36,41 @@ namespace CloudOSTunnel.Services.WSMan
 
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<WSManServer> logger;
-        private readonly IWebHost host;
-        private readonly int port;
-        private readonly string proto;
+        private IWebHost host;
+        private int port;
+        private string proto;
         private readonly bool debug;
 
-        public WSManServer(ILoggerFactory loggerFactory, VMWareClient client, int port, bool useSsl,
-            bool debug, string certPath = null, string certPassword = null)
+        #region ITunnel
+        public string Hostname { get { return Client.HostName; } }
+        public string Reference { get { return Client.MoRef; } }
+
+        public void Shutdown()
         {
-            this.logger = loggerFactory.CreateLogger<WSManServer>();
-            this.loggerFactory = loggerFactory;
-            this.Client = client;
+            if (IsStopped)
+            {
+                LogWarning("Already stopped");
+            }
+            else
+            {
+                // Stop web host
+                host.StopAsync().Wait();
+
+                lock (this)
+                {
+                    // Indicate server stopped for removal
+                    IsStopped = true;
+                }
+
+                // Fast dispose to avoid processing queued requests
+                Dispose();
+            }
+        }
+
+        public void StartListening(int port)
+        {
             this.port = port;
             this.proto = useSsl ? "https" : "http";
-            this.debug = debug;
-            this.IsStopped = false;
-            this.vmAuthCode = Convert.ToBase64String(Encoding.UTF8.GetBytes(client.VmUser + ":" + client.VmPassword));
-            this.runtimes = new Dictionary<string, WSManRuntime>();
 
             // Create web host
             this.host = new WebHostBuilder()
@@ -73,23 +96,31 @@ namespace CloudOSTunnel.Services.WSMan
                 })
                 .UseStartup<WSManStartup>()
                 .Build();
+
+            if (IsStopped)
+            {
+                throw new WSManException("Unable to start a wsman server again after it has been stopped");
+            }
+
+            // Indicate server started
+            IsStopped = false;
+
+            // Start web host
+            host.Start();
         }
+        #endregion ITunnel
 
-        #region TO_BE_IMPLEMENTED
-        public string Hostname => throw new NotImplementedException();
-
-        public string Reference => throw new NotImplementedException();
-
-        public void Shutdown()
+        public WSManServer(ILoggerFactory loggerFactory, VMWareClient client, bool debug)
         {
-            throw new NotImplementedException();
-        }
+            this.logger = loggerFactory.CreateLogger<WSManServer>();
+            this.loggerFactory = loggerFactory;
+            this.Client = client;
+            this.debug = debug;
 
-        public void StartListening(int port)
-        {
-            throw new NotImplementedException();
+            this.IsStopped = false;
+            this.vmAuthCode = Convert.ToBase64String(Encoding.UTF8.GetBytes(client.VmUser + ":" + client.VmPassword));
+            this.runtimes = new Dictionary<string, WSManRuntime>();
         }
-        #endregion TO_BE_IMPLEMENTED
 
         /// <summary>
         /// Validate guest credential by comparing the Base64 encdoed username and password  
@@ -128,48 +159,6 @@ namespace CloudOSTunnel.Services.WSMan
             logger.LogError(string.Format("{0} {1}", Id, msg));
         }
         #endregion Logging
-
-        /// <summary>
-        /// Start server
-        /// </summary>
-        public void Start()
-        {
-            if (IsStopped)
-            {
-                throw new WSManException("Unable to start a wsman server again after it has been stopped");
-            }
-
-            // Indicate server started
-            IsStopped = false;
-
-            // Start web host
-            host.Start();
-        }
-
-        /// <summary>
-        /// Stop server
-        /// </summary>
-        public void Stop()
-        {
-            if (IsStopped)
-            {
-                LogWarning("Already stopped");
-            }
-            else
-            {
-                // Stop web host
-                host.StopAsync().Wait();
-
-                lock (this)
-                {
-                    // Indicate server stopped for removal
-                    IsStopped = true;
-                }
-
-                // Fast dispose to avoid processing queued requests
-                Dispose();
-            }
-        }
 
         /// <summary>
         /// Handle web request
@@ -216,7 +205,7 @@ namespace CloudOSTunnel.Services.WSMan
             {
                 LogError(string.Format("Exception while handing request: {0}", ex));
                 LogError("Stopping server for safety");
-                Stop();
+                Shutdown();
             }
         }
 
@@ -234,7 +223,7 @@ namespace CloudOSTunnel.Services.WSMan
 
             if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create")
             {
-                response = WSManRuntime.HandleCreateShellAction(xml, vmUser, this);
+                response = WSManRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command")
             {

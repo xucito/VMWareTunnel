@@ -124,7 +124,7 @@ namespace CloudOSTunnel.Clients
             }
             else
             {
-                throw new NotImplementedException("Constructor not implmeneted for Windows yet");
+                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
             }
         }
 
@@ -176,7 +176,7 @@ namespace CloudOSTunnel.Clients
             }
             else
             {
-                throw new NotImplementedException("Constructor not implmeneted for Windows yet");
+                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
             }
         }
 

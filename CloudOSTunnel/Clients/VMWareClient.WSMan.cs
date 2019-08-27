@@ -13,14 +13,14 @@ namespace CloudOSTunnel.Clients
     public partial class VMWareClient : IDisposable, IWSManLogging
     {
         #region Constants
-        private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 60;
-        private const int GUEST_OPERATIONS_MAX_RETRIES = 3;
-        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
-        private readonly bool debug;
-
+        //private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 60;
+        //private const int GUEST_OPERATIONS_MAX_RETRIES = 3;
+        //private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
         // Root path in Windows guest (to store temporal files)
         private const string windowsGuestRoot = @"C:\Users\Public\Documents";
         #endregion Constants
+
+        private readonly bool debug;
 
         public string VmUser
         {
@@ -154,12 +154,12 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Invoke windows guest command and specify whether the need to wait for completion
+        /// Invoke windows guest command and specify the need to wait for completion
         /// </summary>
         /// <param name="command"></param>
         /// <param name="wait"></param>
         /// <returns></returns>
-        public int InvokeWindowsGuestCommand(string command, bool wait)
+        private int InvokeWindowsGuestCommand(string command, bool wait)
         {
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
@@ -183,6 +183,35 @@ namespace CloudOSTunnel.Clients
             }
 
             return exitCode;
+        }
+
+        /// <summary>
+        /// Execute simple Windows command
+        /// </summary>
+        /// <param name="command"></param>
+        /// <returns></returns>
+        public CommandResult ExecuteWindowsCommand(string command)
+        {
+            string stdoutPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stdout.txt");
+            string stderrPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stderr.txt");
+
+            string invoker = string.Format("PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command {{{0}}} 1>{1} 2>{2}",
+                command, stdoutPathGuest, stderrPathGuest);
+            int exitCode = InvokeWindowsGuestCommand(invoker, true);
+            LogInformation("Getting output and error from guest");
+            string stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
+            string stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
+            LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
+            LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
+            bool hasOutput = true;
+
+            return new CommandResult
+            {
+                exitCode = exitCode,
+                hasOutput = hasOutput,
+                stdout = stdout,
+                stderr = stderr
+            };
         }
 
         /// <summary>

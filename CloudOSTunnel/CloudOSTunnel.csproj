@@ -28,7 +28,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Certificates\" />
     <Folder Include="ViewModels\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Certificates\CloudOSTunnel.pfx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

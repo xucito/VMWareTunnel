@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using CloudOSTunnel.Clients;
 using CloudOSTunnel.Services;
 using CloudOSTunnel.ViewModels;
+using CloudOSTunnel.Services.WSMan;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -107,8 +108,16 @@ namespace CloudOSTunnel.Controllers
                 //Assume windows
                 else
                 {
-                    // Implement windows here
-                    return BadRequest("WINDOWS HAS NOT BEEN IMPLEMENTED");
+                    var wsmanServer = new WSManServer(loggerFactory, client, value.Debug);
+
+                    return Ok(new
+                    {
+                        Port = _router.InitializeTunnel(wsmanServer),
+                        MoRef = client.MoRef,
+                        Hostname = client.HostName,
+                        ElapsedMs = stopwatch.ElapsedMilliseconds,
+                        FullVMName = client.FullVMName
+                    });
                 }
             }
             catch (Exception e)
