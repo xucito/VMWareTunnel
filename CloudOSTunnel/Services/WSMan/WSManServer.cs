@@ -199,7 +199,7 @@ namespace CloudOSTunnel.Services.WSMan
                 var authCode = request.Headers["Authorization"].First().Split(" ")[1];
                 if (authType == "Basic" && ValidateGuestCredential(authCode))
                 {
-                    var xmlResponse = HandleWsman(xml);
+                    var xmlResponse = await HandleWsman(xml);
                     if (xmlResponse != null)
                     {
                         response.ContentType = "application/soap+xml;charset=UTF-8";
@@ -225,7 +225,7 @@ namespace CloudOSTunnel.Services.WSMan
         /// </summary>
         /// <param name="xml">XML request</param>
         /// <returns>Wsman response</returns>
-        public string HandleWsman(XmlDocument xml)
+        public async Task<string> HandleWsman(XmlDocument xml)
         {
             string response;
             // <w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI>
@@ -253,7 +253,7 @@ namespace CloudOSTunnel.Services.WSMan
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive")
             {
                 string commandId = xml.GetElementsByTagName("rsp:DesiredStream").Item(0).Attributes["CommandId"].Value;
-                response = runtimes[commandId].HandleReceiveAction(xml, commandId);
+                response = await runtimes[commandId].HandleReceiveAction(xml, commandId);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Signal")
             {

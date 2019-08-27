@@ -48,7 +48,8 @@ namespace CloudOSTunnel.Clients
         public string PublicKey;
         #endregion Linux Variables
 
-        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref)
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+            string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
 
@@ -107,21 +108,29 @@ namespace CloudOSTunnel.Clients
                 Password = vmRootPassword
             };
 
-            ExecuteAsRoot = true;
+            if (!GuestFamily.ToLower().Contains("window"))
+            {
+                ExecuteAsRoot = true;
 
-            SetupKey();
-            EntryMessage = ExecuteCommand("sleep 0", out _, out _);
-            EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
-            //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
-            SSHMessageCount = EntryMessage.Count();
-            HostName = ExecuteCommand("hostname", out _, out _);
-            var test = ExecuteCommand("sleep 0", out _, out _);
-            //HostName = HostName.Substring(SSHMessageCount);
+                SetupKey();
+                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+                EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
+                //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
+                SSHMessageCount = EntryMessage.Count();
+                HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                var test = ExecuteLinuxCommand("sleep 0", out _, out _);
+                //HostName = HostName.Substring(SSHMessageCount);
+            }
+            else
+            {
+                throw new NotImplementedException("Constructor not implmeneted for Windows yet");
+            }
         }
 
-
-        public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmUsername, string vmPassword, string moref)
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+            string vmUsername, string vmPassword, string moref)
         {
+            this.logger = loggerFactory.CreateLogger<VMWareClient>();
 
             client = new VimClientImpl();
             client.IgnoreServerCertificateErrors = true;
@@ -137,6 +146,7 @@ namespace CloudOSTunnel.Clients
 
             var foundVM = (VirtualMachine)client.GetView(_vm, null);
 
+            MoRef = moref;
             FullVMName = foundVM.Name;
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
@@ -154,12 +164,18 @@ namespace CloudOSTunnel.Clients
                 Password = vmPassword
             };
 
-            ExecuteAsRoot = vmUsername == null ? true : false;
+            if (!GuestFamily.ToLower().Contains("window"))
+            {
+                ExecuteAsRoot = vmUsername == null ? true : false;
 
-            SetupKey();
-            HostName = ExecuteCommand("hostname", out _, out _);
-            EntryMessage = ExecuteCommand("sleep 0", out _, out _);
-            MoRef = moref;
+                SetupKey();
+                HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+            }
+            else
+            {
+                throw new NotImplementedException("Constructor not implmeneted for Windows yet");
+            }
         }
 
         public string RandomString(int size, bool lowerCase)
@@ -219,7 +235,7 @@ namespace CloudOSTunnel.Clients
             return true;
         }
 
-        public string ExecuteCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
+        public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
         {
             if (commandUniqueIdentifier == null)
             {
@@ -271,10 +287,9 @@ namespace CloudOSTunnel.Clients
             }
         }
 
-        private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string filePath)
+        private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string guestPath)
         {
-
-            var result = fileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
+            var result = fileManager.InitiateFileTransferFromGuest(_vm, auth, guestPath);
 
             using (var handler = new HttpClientHandler
             {
@@ -283,17 +298,17 @@ namespace CloudOSTunnel.Clients
             {
                 HttpClient httpClient = new HttpClient(handler);
 
-                var sshOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
+                var fileTransferOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
 
-                return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return fileTransferOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             }
         }
 
-        public async Task<string> UploadFile(string filePath, byte[] file, string path)
+        public async Task<string> UploadFile(string serverPath, byte[] file, string guestPath)
         {
-            System.Diagnostics.Debug.WriteLine("Uploading file to " + path);
+            System.Diagnostics.Debug.WriteLine("Uploading file to " + guestPath);
 
-            var result = fileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
+            var result = fileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, guestPath, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
@@ -304,7 +319,7 @@ namespace CloudOSTunnel.Clients
                 var sshOutput = await httpClient.PutAsync(result, byteContent);
                 if (sshOutput.IsSuccessStatusCode)
                 {
-                    return filePath;
+                    return serverPath;
                 }
                 else
                 {

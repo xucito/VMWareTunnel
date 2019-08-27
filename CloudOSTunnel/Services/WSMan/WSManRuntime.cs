@@ -10,6 +10,14 @@ using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
+    public class CommandResult
+    {
+        public int exitCode;
+        public string stdout;
+        public string stderr;
+        public bool hasOutput;
+    }
+
     public class WSManRuntime : IWSManLogging
     {
         // Reference to the shared vCenter client
@@ -349,7 +357,7 @@ namespace CloudOSTunnel.Services.WSMan
         /// </summary>
         /// <param name="xml">XML request</param>
         /// <returns>Wsman protocol response</returns>
-        public string HandleReceiveAction(XmlDocument xml, string commandId)
+        public async Task<string> HandleReceiveAction(XmlDocument xml, string commandId)
         {
             // Action 4: Receive http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive
             // Request: <env:Header><w:OperationTimeout>PT9999S</w:OperationTimeout><a:To>http://windows-host:5985/wsman</a:To><w:SelectorSet><w:Selector Name="ShellId">BB6E9B83-A0BC-4577-B121-ED61CA46EED6</w:Selector></w:SelectorSet><w:MaxEnvelopeSize mustUnderstand="true">153600</w:MaxEnvelopeSize><w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI><a:Action mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive</a:Action><p:DataLocale mustUnderstand="false" xml:lang="en-US"></p:DataLocale><a:ReplyTo><a:Address mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address></a:ReplyTo><a:MessageID>uuid:32380b0b-03b3-43a4-b51d-766ee2275403</a:MessageID><w:Locale mustUnderstand="false" xml:lang="en-US"></w:Locale></env:Header><env:Body><rsp:Receive><rsp:DesiredStream CommandId="0832BFA4-BD87-47EE-BA48-80D2B67724D1">stdout stderr</rsp:DesiredStream></rsp:Receive></env:Body>
@@ -367,34 +375,19 @@ namespace CloudOSTunnel.Services.WSMan
             }
 
             // Execute commands
-            bool hasOutput;
-
             try
             {
-                int exitCode = client.ExecuteAnsibleScript(commandId, command,
-                    payloadFile, payloadEncoded, out hasOutput);
-
-                // Assume success 
-                //string vcTaskState = vc.GetAnsibleTaskState(taskId);
-                string vcTaskState = "Success";
-
-                if (!(vcTaskState == "Success" || vcTaskState == "Error"))
-                    throw new Exception(string.Format("vCenter task state is unexpected: {0}", vcTaskState));
+                CommandResult result = await client.ExecuteWindowsCommand(commandId, command,
+                    payloadFile, payloadEncoded);
 
                 string encodedStdout = "";
                 string encodedStderr = "";
-                if (hasOutput)
-                {
-                    // Get output from guest
-                    string stdout, stderr;
-                    LogInformation("Getting output and error from guest");
-                    client.GetAnsibleScriptOutput(commandId, out stdout, out stderr);
-                    LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
-                    LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
 
+                if(result.hasOutput)
+                {
                     // Encode output to Base64 UTF8
-                    encodedStdout = stdout != null ? EncodeUTF8(stdout) : "";
-                    encodedStderr = stderr != null ? EncodeUTF8(stderr) : "";
+                    encodedStdout = result.stdout != null ? EncodeUTF8(result.stdout) : "";
+                    encodedStderr = result.stderr != null ? EncodeUTF8(result.stderr) : "";
                 }
                 else
                 {
@@ -418,7 +411,7 @@ namespace CloudOSTunnel.Services.WSMan
                     + @"<rsp:Stream Name=""stdout"" CommandId=""" + commandId + @""" End=""true""></rsp:Stream>"
                     + @"<rsp:Stream Name=""stderr"" CommandId=""" + commandId + @""" End=""true""></rsp:Stream>"
                     + @"<rsp:CommandState CommandId=""" + commandId + @""" State=""http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Done"">"
-                    + @"<rsp:ExitCode>" + exitCode + "</rsp:ExitCode>"
+                    + @"<rsp:ExitCode>" + result.exitCode + "</rsp:ExitCode>"
                     + @"</rsp:CommandState>"
                     + "</rsp:ReceiveResponse>"
                     + "</s:Body>"

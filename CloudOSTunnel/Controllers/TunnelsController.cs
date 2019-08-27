@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using CloudOSTunnel.Clients;
 using CloudOSTunnel.Services;
 using CloudOSTunnel.ViewModels;
-using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -59,7 +60,7 @@ namespace CloudOSTunnel.Controllers
 
         // POST api/<controller>
         [HttpPost]
-        public IActionResult Post([FromBody]PostTunnelRequestVM value)
+        public IActionResult Post([FromBody]PostTunnelRequestVM value, ILoggerFactory loggerFactory)
         {
             if(!ModelState.IsValid)
             {
@@ -74,11 +75,11 @@ namespace CloudOSTunnel.Controllers
                 
                 if ((value.VMName != "" && value.VMName != null))
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
+                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
                 }
                 else if (value.MoRef != "" && value.MoRef != null)
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
+                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
                 }
                 else
                 {

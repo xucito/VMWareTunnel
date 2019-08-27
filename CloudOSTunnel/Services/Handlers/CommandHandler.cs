@@ -65,7 +65,7 @@ namespace CloudOSTunnel.Services.Handlers
             {
                 //used to allow contiued communication
                 bool isComplete = false;
-                var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
+                var result = _client.ExecuteLinuxCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
                 result = result.Replace("Connection to 127.0.0.1 closed.", "");
                 //result = result.Trim(new char[] { '\n', '\r' });
                 //result = result.Replace("This system is  property of Etisalat, and it must  be used", "");
