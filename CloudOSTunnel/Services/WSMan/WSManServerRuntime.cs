@@ -307,7 +307,7 @@ namespace CloudOSTunnel.Services.WSMan
         /// </summary>
         /// <param name="xml">XML request</param>
         /// <returns>Wsman protocol response</returns>
-        public string HandleSendInputAction(XmlDocument xml, int port)
+        public async Task<string> HandleSendInputAction(XmlDocument xml, int port)
         {
             // Action 3: Send Input http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send
             // Request: <env:Header><w:OperationTimeout>PT9999S</w:OperationTimeout><a:To>http://windows-host:5985/wsman</a:To><w:SelectorSet><w:Selector Name="ShellId">BB6E9B83-A0BC-4577-B121-ED61CA46EED6</w:Selector></w:SelectorSet><w:MaxEnvelopeSize mustUnderstand="true">153600</w:MaxEnvelopeSize><w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI><a:Action mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send</a:Action><p:DataLocale mustUnderstand="false" xml:lang="en-US"></p:DataLocale><a:ReplyTo><a:Address mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address></a:ReplyTo><a:MessageID>uuid:33ab78de-f9d8-4af8-9705-21773e9f5a3a</a:MessageID><w:Locale mustUnderstand="false" xml:lang="en-US"></w:Locale></env:Header><env:Body><rsp:Send><rsp:Stream End="true" Name="stdin" CommandId="0832BFA4-BD87-47EE-BA48-80D2B67724D1"><encodedCommand></rsp:Stream></rsp:Send></env:Body>
@@ -334,7 +334,7 @@ namespace CloudOSTunnel.Services.WSMan
             }
 
             // Write stdin command to disk
-            payloadWriter.Write(stdinCommand);
+            await payloadWriter.WriteAsync(stdinCommand);
 
             string responseMessageId = "uuid:" + Guid.NewGuid();
             string body = @"<s:Envelope xml:lang=""en-US"" xmlns:s=""http://www.w3.org/2003/05/soap-envelope"" xmlns:a=""http://schemas.xmlsoap.org/ws/2004/08/addressing"" xmlns:x=""http://schemas.xmlsoap.org/ws/2004/09/transfer"" xmlns:w=""http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"" xmlns:rsp=""http://schemas.microsoft.com/wbem/wsman/1/windows/shell"" xmlns:p=""http://schemas.microsoft.com/wbem/wsman/1/wsman.xsd"">"

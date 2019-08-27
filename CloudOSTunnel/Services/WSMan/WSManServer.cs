@@ -26,7 +26,7 @@ namespace CloudOSTunnel.Services.WSMan
         public VMWareClient Client { get; private set; }
 
         // WSMan runtime dictionary: command id as key
-        private Dictionary<string, WSManServerRuntime> runtimes;
+        private Dictionary<string, WSManServerRuntime> runtime;
         // Signal stopped server (used by WsmanServerManager for cleanup)
         public bool IsStopped { get; private set; }
 
@@ -115,7 +115,7 @@ namespace CloudOSTunnel.Services.WSMan
             this.debug = debug;
 
             this.IsStopped = false;
-            this.runtimes = new Dictionary<string, WSManServerRuntime>();
+            this.runtime = new Dictionary<string, WSManServerRuntime>();
         }
 
         #region Logging
@@ -167,26 +167,26 @@ namespace CloudOSTunnel.Services.WSMan
                 // Generate a command id and create runtime
                 string commandId = "" + Guid.NewGuid();
                 var wsmanRuntime = new WSManServerRuntime(loggerFactory, Client, commandId, Id);
-                runtimes.Add(commandId, wsmanRuntime);
+                runtime.Add(commandId, wsmanRuntime);
 
                 response = wsmanRuntime.HandleExecuteCommandAction(xml);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send")
             {
                 string commandId = xml.GetElementsByTagName("rsp:Stream").Item(0).Attributes["CommandId"].Value;
-                response = runtimes[commandId].HandleSendInputAction(xml, port);
+                response = await runtime[commandId].HandleSendInputAction(xml, port);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive")
             {
                 string commandId = xml.GetElementsByTagName("rsp:DesiredStream").Item(0).Attributes["CommandId"].Value;
-                response = await runtimes[commandId].HandleReceiveAction(xml, commandId);
+                response = await runtime[commandId].HandleReceiveAction(xml, commandId);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Signal")
             {
                 string commandId = xml.GetElementsByTagName("rsp:Signal").Item(0).Attributes["CommandId"].Value;
                 // Delete runtime for the command id
-                response = runtimes[commandId].HandleSignalAction(xml);
-                runtimes.Remove(commandId);
+                response = runtime[commandId].HandleSignalAction(xml);
+                runtime.Remove(commandId);
             }
             else if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete")
             {
@@ -209,7 +209,7 @@ namespace CloudOSTunnel.Services.WSMan
             host.Dispose();
 
             // Delete all runtime commands
-            runtimes.Clear();
+            runtime.Clear();
         }
     }
 }
