@@ -317,6 +317,9 @@ namespace CloudOSTunnel.Clients
             })
             {
                 HttpClient httpClient = new HttpClient(handler);
+                // Must disable keepalive to prevent timeout while transfering large file
+                httpClient.DefaultRequestHeaders.ConnectionClose = true;
+
                 ByteArrayContent byteContent = new ByteArrayContent(file);
                 var sshOutput = await httpClient.PutAsync(result, byteContent);
                 if (sshOutput.IsSuccessStatusCode)

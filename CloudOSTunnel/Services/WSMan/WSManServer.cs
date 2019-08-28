@@ -35,7 +35,6 @@ namespace CloudOSTunnel.Services.WSMan
         private IWebHost host;
         private int port;
         private string proto;
-        private readonly bool debug;
 
         #region ITunnel
         public string Hostname { get { return Client.HostName; } }
@@ -107,12 +106,11 @@ namespace CloudOSTunnel.Services.WSMan
         }
         #endregion ITunnel
 
-        public WSManServer(ILoggerFactory loggerFactory, VMWareClient client, bool debug)
+        public WSManServer(ILoggerFactory loggerFactory, VMWareClient client)
         {
             this.logger = loggerFactory.CreateLogger<WSManServer>();
             this.loggerFactory = loggerFactory;
             this.Client = client;
-            this.debug = debug;
 
             this.IsStopped = false;
             this.runtime = new Dictionary<string, WSManServerRuntime>();

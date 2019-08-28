@@ -118,13 +118,14 @@ namespace CloudOSTunnel.Services.WSMan
         private void DeletePayloadWriter()
         {
             System.IO.File.Delete(this.payloadFile);
+
             this.payloadFile = null;
             this.payloadWriter = null;
         }
 
-        private void WritePayload(string payload)
+        private async Task WritePayload(string payload)
         {
-            this.payloadWriter.Write(payload);
+            await this.payloadWriter.WriteAsync(payload);
         }
 
         public void Dispose()
@@ -334,7 +335,7 @@ namespace CloudOSTunnel.Services.WSMan
             }
 
             // Write stdin command to disk
-            await payloadWriter.WriteAsync(stdinCommand);
+            await WritePayload(stdinCommand);
 
             string responseMessageId = "uuid:" + Guid.NewGuid();
             string body = @"<s:Envelope xml:lang=""en-US"" xmlns:s=""http://www.w3.org/2003/05/soap-envelope"" xmlns:a=""http://schemas.xmlsoap.org/ws/2004/08/addressing"" xmlns:x=""http://schemas.xmlsoap.org/ws/2004/09/transfer"" xmlns:w=""http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"" xmlns:rsp=""http://schemas.microsoft.com/wbem/wsman/1/windows/shell"" xmlns:p=""http://schemas.microsoft.com/wbem/wsman/1/wsman.xsd"">"
@@ -422,7 +423,8 @@ namespace CloudOSTunnel.Services.WSMan
             finally
             {
                 command = null;
-                DeletePayloadWriter();
+                if(payloadFile != null)
+                    DeletePayloadWriter();
             }
         }
 

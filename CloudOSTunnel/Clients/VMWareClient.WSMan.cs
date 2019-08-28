@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using VMware.Vim;
 using CloudOSTunnel.Services.WSMan;
 using System.Net.Http;
+using System.Net;
 
 namespace CloudOSTunnel.Clients
 {
@@ -98,26 +99,22 @@ namespace CloudOSTunnel.Clients
                 })
                 {
                     HttpClient httpClient = new HttpClient(handler);
-                    byte[] buffer = new byte[1 * 1024 * 1024]; // Use 1MB buffer
-                    long remainingBytesToRead = fs.Length;
-                    while (remainingBytesToRead > 0)
+                    // Must disable keepalive to prevent timeout while transfering large file
+                    //httpClient.DefaultRequestHeaders.ConnectionClose = true;
+                    httpClient.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+                    StreamContent streamContent = new StreamContent(fs, 8 * 1024 * 1024); // Use 8MB buffer
+                    
+                    //var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(fileTransferRef))
+                    //httpRequestMessage.Version = HttpVersion.Version10;
+                    //httpRequestMessage.Content = streamContent;
+
+                    // var uploadResponse = await httpClient.SendAsync(httpRequestMessage);
+                    var uploadResponse = await httpClient.PutAsync(fileTransferRef, streamContent);
+                    if (!uploadResponse.IsSuccessStatusCode)
                     {
-                        // Read up to buffer size
-                        int bytesRead = await fs.ReadAsync(buffer, 0, buffer.Length);
-                        if (bytesRead == 0)
-                            break;
-
-                        // Upload a file chunk stored in buffer
-                        ByteArrayContent byteContent = new ByteArrayContent(buffer, 0, bytesRead);
-                        var uploadResponse = await httpClient.PutAsync(fileTransferRef, byteContent);
-                        if (!uploadResponse.IsSuccessStatusCode)
-                        {
-                            var message = (await uploadResponse.Content.ReadAsStringAsync());
-                            LogError("Failed to upload with error " + message);
-                            throw new Exception("Failed to upload file to " + message);
-                        }
-
-                        remainingBytesToRead -= bytesRead;
+                        var message = (await uploadResponse.Content.ReadAsStringAsync());
+                        LogError("Failed to upload file with error " + message);
+                        throw new Exception("Failed to upload file with error " + message);
                     }
                     return serverPath;
                 }
@@ -148,9 +145,8 @@ namespace CloudOSTunnel.Clients
             {
                 process = processManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
                 // Reduce number of calls to vCenter
-                System.Threading.Thread.Sleep(1000);
-            }
-            while (process.Count() != 1 || process[0].EndTime == null);
+                System.Threading.Thread.Sleep(500);
+            } while (process.Count() != 1 || process[0].EndTime == null);
 
             exitCode = process[0].ExitCode.Value;
 
@@ -166,13 +162,11 @@ namespace CloudOSTunnel.Clients
         private int InvokeWindowsGuestProcess(string command, bool wait)
         {
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-            var split = command.Split(" ");
-            string program = split[0];
-            string arguments = string.Join(" ", split.Skip(1));
+
             long pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
-                ProgramPath = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
-                Arguments = arguments,
+                ProgramPath = @"cmd.exe",
+                Arguments = "/C " + command,
                 WorkingDirectory = windowsGuestRoot
             });
 
@@ -228,7 +222,7 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Execute simple Windows command
+        /// Execute simple Windows command without WSMan
         /// </summary>
         /// <param name="command"></param>
         /// <returns></returns>
@@ -297,6 +291,8 @@ namespace CloudOSTunnel.Clients
             string invoker;
             bool isReboot = false;
 
+            string[] filesToDelete;
+
             string filePrefix = GetWsmanFilePrefix(commandId);
 
             string stdoutPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_stdout.txt");
@@ -338,6 +334,7 @@ namespace CloudOSTunnel.Clients
 
                     // Directly invoke because it starts with PowerShell..
                     invoker = string.Format("{0} 1>{1} 2>{2}", command, stdoutPathGuest, stderrPathGuest);
+                    filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
                 }
                 else
                 {
@@ -346,6 +343,7 @@ namespace CloudOSTunnel.Clients
                     {
                         // Single command e.g. (Get-WmiObject -ClassName Win32_OperatingSystem).LastBootUpTime
                         invoker = GetFullCommand(command, stdoutPathGuest, stderrPathGuest);
+                        filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
                     }
                     else
                     {
@@ -366,6 +364,7 @@ namespace CloudOSTunnel.Clients
                     // Note: -NoProfile must be used in the out-most PowerShell
                     string psCommand = string.Format("Get-Content {0} | {1}", payloadPathGuest, command);
                     invoker = GetFullCommand(psCommand, stdoutPathGuest, stderrPathGuest);
+                    filesToDelete = new string[] { payloadPathGuest, stdoutPathGuest, stderrPathGuest };
                 }
                 else if (command.StartsWith("begin", StringComparison.OrdinalIgnoreCase))
                 {
@@ -382,6 +381,7 @@ namespace CloudOSTunnel.Clients
                         // Note: -NoProfile must be used in the out-most PowerShell
                         string psCommand = string.Format("Get-Content {0} | {1}", payloadPathGuest, cmdPathGuest);
                         invoker = GetFullCommand(psCommand, stdoutPathGuest, stderrPathGuest);
+                        filesToDelete = new string[] { payloadPathGuest, cmdPathGuest, stdoutPathGuest, stderrPathGuest };
                     }
                     else
                     {
@@ -396,6 +396,12 @@ namespace CloudOSTunnel.Clients
 
             LogInformation(invoker);
 
+            /*
+            // Debug invoker
+            string invokerPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_invoker.ps1");
+            string invokerPathServer = Path.Join(Path.GetTempPath(), filePrefix + "_invoker.ps1");
+            await UploadFile(invoker, invokerPathServer, invokerPathGuest); */
+
             // Invoke and get output
             if (isReboot)
             {
@@ -408,6 +414,10 @@ namespace CloudOSTunnel.Clients
             {
                 // Invoke command and wait for completion
                 exitCode = InvokeWindowsGuestProcess(invoker, true);
+                if(exitCode != 0)
+                {
+                    Console.WriteLine();
+                }
                 LogInformation("Getting output and error from guest");
                 stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
                 stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
@@ -415,8 +425,7 @@ namespace CloudOSTunnel.Clients
                 LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
                 hasOutput = true;
                 // Delete temp files
-                CleanupWindowsCommand(new string[] {
-                    cmdPathGuest, payloadPathGuest, stdoutPathGuest, stderrPathGuest});
+                CleanupWindowsCommand(filesToDelete);
             }
 
             return new CommandResult

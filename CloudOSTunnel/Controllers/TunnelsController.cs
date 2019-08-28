@@ -110,7 +110,7 @@ namespace CloudOSTunnel.Controllers
                 //Assume windows
                 else
                 {
-                    var wsmanServer = new WSManServer(loggerFactory, client, value.Debug);
+                    var wsmanServer = new WSManServer(loggerFactory, client);
 
                     return Ok(new
                     {
