@@ -99,7 +99,7 @@ namespace CloudOSTunnel.Clients
                 {
                     HttpClient httpClient = new HttpClient(handler);
                     byte[] buffer = new byte[1 * 1024 * 1024]; // Use 1MB buffer
-                    int remainingBytesToRead = (int)fs.Length;
+                    long remainingBytesToRead = fs.Length;
                     while (remainingBytesToRead > 0)
                     {
                         // Read up to buffer size
