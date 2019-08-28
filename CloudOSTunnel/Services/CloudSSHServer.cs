@@ -60,6 +60,7 @@ namespace CloudOSTunnel.Services
                 channels.Remove(deletionKey);
             }
 
+            _server.Stop();
             //Logout from vmware
             _client.Logout();
 

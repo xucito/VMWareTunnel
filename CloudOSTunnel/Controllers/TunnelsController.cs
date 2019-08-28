@@ -135,10 +135,15 @@ namespace CloudOSTunnel.Controllers
 
         // DELETE api/<controller>/5
         [HttpDelete("{port}")]
-        public void Delete(int port)
+        public IActionResult Delete(int port)
         {
             if (_router.GetServer(port) != null)
+            {
                 _router.DisconnectClient(port);
+                return Ok();
+            }
+            else
+                return BadRequest();
         }
     }
 }

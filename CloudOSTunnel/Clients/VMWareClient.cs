@@ -15,15 +15,76 @@ namespace CloudOSTunnel.Clients
 {
     public class VMWareClient
     {
-        private readonly GuestOperationsManager guest;
-        private readonly GuestFileManager fileManager;
-        private GuestProcessManager processManager;
+        private GuestOperationsManager _guestOperationsManager;
+        private GuestOperationsManager GuestOperationsManager
+        {
+            get
+            {
+                if (_guestOperationsManager == null || (DateTime.Now - lastAuthenticatedCheck).TotalMinutes > 30)
+                {
+                    _guestOperationsManager = (GuestOperationsManager)client.GetView(_client.ServiceContent.GuestOperationsManager, null);
+                }
+                return _guestOperationsManager;
+            }
+        }
+
+        private GuestFileManager _fileManager;
+        private GuestFileManager FileManager
+        {
+            get
+            {
+                if (_fileManager == null || (DateTime.Now - lastAuthenticatedCheck).TotalMinutes > 30)
+                {
+                    _fileManager = (GuestFileManager)client.GetView(GuestOperationsManager.FileManager, null);
+                }
+                return _fileManager;
+            }
+        }
+
+        private GuestProcessManager _processManager;
+        private GuestProcessManager ProcessManager
+        {
+            get
+            {
+                if (_processManager == null || (DateTime.Now - lastAuthenticatedCheck).TotalMinutes > 30)
+                {
+                    _processManager = (GuestProcessManager)client.GetView(GuestOperationsManager.ProcessManager, null);
+                }
+                return _processManager;
+            }
+        }
+
         private readonly string _serviceUrl = "";
         private readonly string _vCenterUsername = "";
         private readonly string _vCenterPassword = "";
         private ManagedObjectReference _vm;
         private NamePasswordAuthentication _executingCredentials;
-        private VimClientImpl client;
+        private VimClientImpl _client { get; set; }
+        private DateTime lastAuthenticatedCheck;
+        private VimClientImpl client
+        {
+            get
+            {
+                //Only recheck the last authenticated every 30 minutes
+                if ((DateTime.Now - lastAuthenticatedCheck).TotalMinutes < 30)
+                {
+                    return _client;
+                }
+
+                var testSession = (SessionManager)_client.GetView(_client.ServiceContent.SessionManager, null);
+                var isActive = testSession.CurrentSession;
+
+                if (isActive != null)
+                {
+                    return _client;
+                }
+                else
+                {
+                    RefreshClient();
+                    return _client;
+                }
+            }
+        }
         public readonly string HostName;
         public readonly string MoRef;
         private string _baseOutputPath = "/tmp/vmwaretunnel-";
@@ -40,17 +101,18 @@ namespace CloudOSTunnel.Clients
 
         public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
-            client = new VimClientImpl();
-            client.IgnoreServerCertificateErrors = true;
-            client.Connect(serviceUrl);
+            _serviceUrl = serviceUrl;
+            _vCenterUsername = vcenterUsername;
+            _vCenterPassword = vcenterPassword;
+            RefreshClient();
 
-            var session = client.Login(vcenterUsername, vcenterPassword);
             NameValueCollection filter = new NameValueCollection();
             filter.Add("Name", String.Format("^{0}$", Regex.Escape(vmName)));
             var foundVM = (VirtualMachine)client.FindEntityView(typeof(VirtualMachine), null, filter, null);
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
             FullVMName = foundVM.Name;
+
             if (foundVM != null)
             {
                 if (moref != "" && moref != null)
@@ -82,10 +144,6 @@ namespace CloudOSTunnel.Clients
                 throw new Exception(vmName + " not found.");
             }
 
-            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
-            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-
             SessionId = RandomString(6, true);
             _baseOutputPath = _baseOutputPath + SessionId;
 
@@ -111,11 +169,10 @@ namespace CloudOSTunnel.Clients
         public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmUsername, string vmPassword, string moref)
         {
 
-            client = new VimClientImpl();
-            client.IgnoreServerCertificateErrors = true;
-            client.Connect(serviceUrl);
-
-            var session = client.Login(vcenterUsername, vcenterPassword);
+            _serviceUrl = serviceUrl;
+            _vCenterUsername = vcenterUsername;
+            _vCenterPassword = vcenterPassword;
+            RefreshClient();
 
             _vm = new ManagedObjectReference()
             {
@@ -128,10 +185,6 @@ namespace CloudOSTunnel.Clients
             FullVMName = foundVM.Name;
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
-
-            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
-            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
             SessionId = RandomString(6, true);
             _baseOutputPath = _baseOutputPath + SessionId;
@@ -148,6 +201,16 @@ namespace CloudOSTunnel.Clients
             HostName = ExecuteCommand("hostname", out _, out _);
             EntryMessage = ExecuteCommand("sleep 0", out _, out _);
             MoRef = moref;
+        }
+
+        public void RefreshClient()
+        {
+            _client = new VimClientImpl();
+            _client.IgnoreServerCertificateErrors = true;
+            _client.Connect(_serviceUrl);
+
+            var session = _client.Login(_vCenterUsername, _vCenterPassword);
+            lastAuthenticatedCheck = DateTime.Now;
         }
 
         public string RandomString(int size, bool lowerCase)
@@ -169,9 +232,9 @@ namespace CloudOSTunnel.Clients
         {
             System.Diagnostics.Debug.WriteLine("Setting up key");
 
-            fileManager.MakeDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, false);
+            FileManager.MakeDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, false);
 
-            var pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = "/usr/bin/ssh-keygen",
                 Arguments = "-t rsa -N \"\" -f " + _baseOutputPath + "/vmwaretunnelkey",
@@ -182,7 +245,7 @@ namespace CloudOSTunnel.Clients
 
             PublicKey = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/vmwaretunnelkey.pub");
 
-            pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = "/usr/bin/cat",
                 Arguments = _baseOutputPath + "/vmwaretunnelkey.pub >> ~/.ssh/authorized_keys",
@@ -199,7 +262,7 @@ namespace CloudOSTunnel.Clients
             GuestProcessInfo[] process;
             do
             {
-                process = processManager.ListProcessesInGuest(_vm,
+                process = ProcessManager.ListProcessesInGuest(_vm,
                 _executingCredentials, new long[] { pid });
             }
             while (process.Count() != 1 || process[0].EndTime == null);
@@ -218,14 +281,10 @@ namespace CloudOSTunnel.Clients
 
             var sshCommand = command;
 
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-            //  if (command.Split(' ')[0] != "/bin/sh")
-            // {
-
             var fullCommand = "/usr/bin/ssh" + " -i " + PrivateFileLocation + " -o StrictHostKeyChecking=no  -t -t  " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"").Replace("\'", "\\\'") + ")\" &> " + _baseOutputPath + "/" + outputFileName;
 
             System.Diagnostics.Debug.WriteLine("Full command path:  " + fullCommand);
-            pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = "/usr/bin/ssh",
                 Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"") + ")\" > " + _baseOutputPath + "/" + outputFileName + " 2>&1",//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
@@ -236,7 +295,7 @@ namespace CloudOSTunnel.Clients
 
             isComplete = AwaitProcess(pid);
 
-            var files = fileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
+            var files = FileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
 
             if (files.Files != null && files.Files.Count() == 1)
             {
@@ -249,7 +308,7 @@ namespace CloudOSTunnel.Clients
 
                 //fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
 
-                fileManager.DeleteFileInGuest(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
+                FileManager.DeleteFileInGuest(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
 
                 return (output.Trim(new char[] { '\n', '\r' }).Substring(SSHMessageCount).Replace("Connection to 127.0.0.1 closed.", ""));
             }
@@ -262,7 +321,7 @@ namespace CloudOSTunnel.Clients
         private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string filePath)
         {
 
-            var result = fileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
+            var result = FileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
 
             using (var handler = new HttpClientHandler
             {
@@ -281,7 +340,7 @@ namespace CloudOSTunnel.Clients
         {
             System.Diagnostics.Debug.WriteLine("Uploading file to " + path);
 
-            var result = fileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
+            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
@@ -307,8 +366,7 @@ namespace CloudOSTunnel.Clients
         {
             try
             {
-
-                fileManager.DeleteDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, true);
+                FileManager.DeleteDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, true);
                 client.Logout();
             }
             catch (Exception e)
