@@ -29,6 +29,8 @@ namespace CloudOSTunnel.Services.WSMan
         // Used to record encoded payload begin time and end time
         private DateTime? payloadBeginTime, payloadEndTime;
 
+        // Port number assigned by the server
+        private readonly int port;
         // Command ID assigned for each command (used throughout the command lifetime)
         private readonly string commandId;
         // Logging prefix
@@ -60,10 +62,11 @@ namespace CloudOSTunnel.Services.WSMan
         private StreamWriter payloadWriter;
         #endregion Protocol Types and Attributes
 
-        internal WSManServerRuntime(ILoggerFactory loggerFactory, VMWareClient client, string commandId, string loggingPrefix)
+        internal WSManServerRuntime(ILoggerFactory loggerFactory, VMWareClient client, int port, string commandId, string loggingPrefix)
         {
             this.logger = loggerFactory.CreateLogger<WSManServerRuntime>();
             this.client = client;
+            this.port = port;
             this.commandId = commandId;
             this.loggingPrefix = loggingPrefix;
 
@@ -378,7 +381,7 @@ namespace CloudOSTunnel.Services.WSMan
             // Execute commands
             try
             {
-                CommandResult result = await client.ExecuteWindowsCommand(commandId, command,
+                CommandResult result = await client.ExecuteWindowsCommand(port, commandId, command,
                     payloadFile, payloadEncoded);
 
                 string encodedStdout = "";

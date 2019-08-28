@@ -164,7 +164,7 @@ namespace CloudOSTunnel.Services.WSMan
             {
                 // Generate a command id and create runtime
                 string commandId = "" + Guid.NewGuid();
-                var wsmanRuntime = new WSManServerRuntime(loggerFactory, Client, commandId, Id);
+                var wsmanRuntime = new WSManServerRuntime(loggerFactory, Client, port, commandId, Id);
                 runtime.Add(commandId, wsmanRuntime);
 
                 response = wsmanRuntime.HandleExecuteCommandAction(xml);

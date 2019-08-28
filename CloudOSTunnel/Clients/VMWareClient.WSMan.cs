@@ -87,37 +87,37 @@ namespace CloudOSTunnel.Clients
         {
             LogInformation(string.Format("Uploading {0} to {1}", serverPath, guestPath));
 
-            using (FileStream fs = new FileStream(serverPath, FileMode.Open, FileAccess.Read))
+            try
             {
-                var fileTransferRef = fileManager.InitiateFileTransferToGuest(_vm, 
-                    _executingCredentials, guestPath,
-                    new GuestFileAttributes() { }, 
-                    fs.Length, true);
-                using (var handler = new HttpClientHandler
+                using (FileStream fs = new FileStream(serverPath, FileMode.Open, FileAccess.Read))
                 {
-                    ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
-                })
-                {
-                    HttpClient httpClient = new HttpClient(handler);
-                    // Must disable keepalive to prevent timeout while transfering large file
-                    //httpClient.DefaultRequestHeaders.ConnectionClose = true;
-                    httpClient.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
-                    StreamContent streamContent = new StreamContent(fs, 8 * 1024 * 1024); // Use 8MB buffer
-                    
-                    //var httpRequestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(fileTransferRef))
-                    //httpRequestMessage.Version = HttpVersion.Version10;
-                    //httpRequestMessage.Content = streamContent;
-
-                    // var uploadResponse = await httpClient.SendAsync(httpRequestMessage);
-                    var uploadResponse = await httpClient.PutAsync(fileTransferRef, streamContent);
-                    if (!uploadResponse.IsSuccessStatusCode)
+                    var fileTransferRef = fileManager.InitiateFileTransferToGuest(_vm,
+                        _executingCredentials, guestPath,
+                        new GuestFileAttributes() { },
+                        fs.Length, true);
+                    using (var handler = new HttpClientHandler
                     {
-                        var message = (await uploadResponse.Content.ReadAsStringAsync());
-                        LogError("Failed to upload file with error " + message);
-                        throw new Exception("Failed to upload file with error " + message);
+                        ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
+                    })
+                    {
+                        HttpClient httpClient = new HttpClient(handler);
+                        httpClient.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+                        StreamContent streamContent = new StreamContent(fs, 8 * 1024 * 1024); // Use 8MB buffer
+                        var uploadResponse = await httpClient.PutAsync(fileTransferRef, streamContent);
+                        if (!uploadResponse.IsSuccessStatusCode)
+                        {
+                            var message = (await uploadResponse.Content.ReadAsStringAsync());
+                            LogError("Failed to upload file with error " + message);
+                            throw new Exception("Failed to upload file with error " + message);
+                        }
+                        return serverPath;
                     }
-                    return serverPath;
                 }
+            }
+            finally
+            {
+                LogInformation(string.Format("Deleting {0}", serverPath));
+                File.Delete(serverPath);
             }
         }
 
@@ -211,7 +211,7 @@ namespace CloudOSTunnel.Clients
         /// </summary>
         /// <param name="guestPaths"></param>
         /// <returns></returns>
-        private int CleanupWindowsCommand(string[] guestPaths)
+        private int DeleteWindowsGuestFiles(string[] guestPaths)
         {
             if (guestPaths == null || guestPaths.Length == 0)
                 throw new WSManException("Windows guest files to clean up must be specified");
@@ -248,7 +248,7 @@ namespace CloudOSTunnel.Clients
             bool hasOutput = true;
 
             // Delete temp files
-            CleanupWindowsCommand(new string[] { stdoutPathGuest, stderrPathGuest });
+            DeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
 
             return new CommandResult
             {
@@ -268,7 +268,7 @@ namespace CloudOSTunnel.Clients
         /// <param name="base64Payload">Indicate whether payload is Base64 encoded</param>
         /// <param name="hasOutput">Output whether it will produce output</param>
         /// <returns></returns>
-        public async Task<CommandResult> ExecuteWindowsCommand(string commandId, string command,
+        public async Task<CommandResult> ExecuteWindowsCommand(int port, string commandId, string command,
             string payloadPathOnServer, bool base64Payload)
         {
             // Check whether decoded command contains reboot code
@@ -300,7 +300,7 @@ namespace CloudOSTunnel.Clients
             string payloadPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_payload.txt");
             string cmdPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_command.ps1");
 
-            string cmdPathServer = Path.Join(Path.GetTempPath(), filePrefix + "_command.ps1");
+            string cmdPathServer = Path.Join(Path.GetTempPath(), port + "_command.ps1");
 
             // There are 4 cases of known command formats so far:
             // 1) No payload, command starts with PowerShell and uses -EncodedCommand
@@ -425,7 +425,7 @@ namespace CloudOSTunnel.Clients
                 LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
                 hasOutput = true;
                 // Delete temp files
-                CleanupWindowsCommand(filesToDelete);
+                DeleteWindowsGuestFiles(filesToDelete);
             }
 
             return new CommandResult
