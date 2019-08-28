@@ -209,7 +209,7 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Delete temp files used in Windows guest
+        /// Delete files in Windows guest
         /// </summary>
         /// <param name="guestPaths"></param>
         /// <returns></returns>
@@ -219,7 +219,7 @@ namespace CloudOSTunnel.Clients
                 throw new WSManException("Windows guest files to clean up must be specified");
 
             string fullCommand = GetFullCommand("Remove-Item -Path " + string.Join(",", guestPaths) + " -Confirm:$false");
-            LogInformation("Clearing temp files in Windows guest");
+            LogInformation("Clearing files in Windows guest");
             return InvokeWindowsGuestProcess(fullCommand, true);
         }
 
