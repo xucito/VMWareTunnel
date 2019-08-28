@@ -113,6 +113,11 @@ namespace CloudOSTunnel.Services.WSMan
         #region Payload Writer
         private void CreatePayloadWriter(int port)
         {
+            if(this.payloadFile != null)
+            {
+                throw new WSManException(
+                    string.Format("Unable to create payload file {0} as it already exists", this.payloadFile));
+            }
             this.payloadFile = Path.Join(Path.GetTempPath(), string.Format("{0}_{1}", port, commandId));
             this.payloadWriter = new StreamWriter(payloadFile, false);
             this.payloadWriter.AutoFlush = true;
@@ -120,7 +125,8 @@ namespace CloudOSTunnel.Services.WSMan
 
         private void DeletePayloadWriter()
         {
-            System.IO.File.Delete(this.payloadFile);
+            if(this.payloadFile != null)
+                System.IO.File.Delete(this.payloadFile);
 
             this.payloadFile = null;
             this.payloadWriter = null;
@@ -271,9 +277,10 @@ namespace CloudOSTunnel.Services.WSMan
             command = decodedCommand;
 
             // Failfast on receiving duplicate commands
-            // This can happen when win_reboot does not specify connect_timeout that is large enough for guest operations overhead
-            // Then win_reboot will send many duplicate commands.
-            // In this case, terminate the server to avoid problems
+            // This happens when win_reboot does not specify connect_timeout long enough to tolerate guest operations overhead
+            // Then win_reboot will send many duplicate commands which are impossible to handle timely
+            // In this case, terminate the server to avoid further problems
+            // Resolution: User must shut down tunnel then create a new one
             if (command == lastCommand && command != STANDARD_WRAPPER_COMMAND)
             {
                 string msg = string.Format("Duplicate command received: {0}", command);
@@ -333,7 +340,7 @@ namespace CloudOSTunnel.Services.WSMan
             {
                 CreatePayloadWriter(port);
                 payloadBeginTime = DateTime.Now;
-                LogWarning(string.Format("Payload started {0}",
+                LogInformation(string.Format("Payload started {0}",
                     payloadBeginTime.Value.ToString("yyyy/MM/dd HH:mm:ss")));
             }
 
@@ -374,8 +381,8 @@ namespace CloudOSTunnel.Services.WSMan
                 payloadWriter.Close();
 
                 payloadEndTime = DateTime.Now;
-                LogWarning(string.Format("Payload ended {0}", payloadEndTime.Value.ToString("yyyy/MM/dd HH:mm:ss")));
-                LogWarning(string.Format("Payload took {0:0} seconds", (payloadEndTime - payloadBeginTime).Value.TotalSeconds));
+                LogInformation(string.Format("Payload ended {0}", payloadEndTime.Value.ToString("yyyy/MM/dd HH:mm:ss")));
+                LogInformation(string.Format("Payload took {0:0} seconds", (payloadEndTime - payloadBeginTime).Value.TotalSeconds));
             }
 
             // Execute commands
@@ -426,8 +433,7 @@ namespace CloudOSTunnel.Services.WSMan
             finally
             {
                 command = null;
-                if(payloadFile != null)
-                    DeletePayloadWriter();
+                DeletePayloadWriter();
             }
         }
 
