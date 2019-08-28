@@ -65,7 +65,6 @@ namespace CloudOSTunnel.Services.WSMan
         }
         #endregion Logging
 
-
         #region ITunnel
         public string Hostname { get { return Client.HostName; } }
         public string Reference { get { return Client.MoRef; } }
