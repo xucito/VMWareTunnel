@@ -14,7 +14,7 @@ using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
-    public class WSManServer : ITunnel, IWSManLogging, IDisposable
+    public class WSManServer : ITunnel, IWSManLogging<WSManServer>, IDisposable
     {
         #region Configuration
         private const bool useSsl = true;
@@ -22,19 +22,49 @@ namespace CloudOSTunnel.Services.WSMan
         private const string certPassword = "CloudOSTunnel";
         #endregion Configuration
 
-        // VMware client to access vCenter
+        // vCenter client
         public VMWareClient Client { get; private set; }
 
         // WSMan runtime dictionary: command id as key
-        private Dictionary<string, WSManServerRuntime> runtime;
-        // Signal stopped server (used by WsmanServerManager for cleanup)
+        private Dictionary<string, WSManRuntime> runtime;
+        // Signal stopped WSMan server
         public bool IsStopped { get; private set; }
 
         private readonly ILoggerFactory loggerFactory;
-        private readonly ILogger<WSManServer> logger;
         private IWebHost host;
         private int port;
         private string proto;
+
+        #region Logging
+        // ID for logging e.g. https://*:59860
+        public string Id
+        {
+            get { return string.Format("{0}://{1}:{2}", proto, "*", port); }
+        }
+
+        public ILogger<WSManServer> Logger { get; private set; }
+
+        public void LogInformation(string msg)
+        {
+            Logger.LogInformation(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogDebug(string msg)
+        {
+            Logger.LogDebug(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogWarning(string msg)
+        {
+            Logger.LogWarning(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogError(string msg)
+        {
+            Logger.LogError(string.Format("{0} {1}", Id, msg));
+        }
+        #endregion Logging
+
 
         #region ITunnel
         public string Hostname { get { return Client.HostName; } }
@@ -44,7 +74,7 @@ namespace CloudOSTunnel.Services.WSMan
         {
             if (IsStopped)
             {
-                LogWarning("Already stopped");
+                LogWarning("Already shut down");
             }
             else
             {
@@ -108,41 +138,13 @@ namespace CloudOSTunnel.Services.WSMan
 
         public WSManServer(ILoggerFactory loggerFactory, VMWareClient client)
         {
-            this.logger = loggerFactory.CreateLogger<WSManServer>();
+            this.Logger = loggerFactory.CreateLogger<WSManServer>();
             this.loggerFactory = loggerFactory;
             this.Client = client;
 
             this.IsStopped = false;
-            this.runtime = new Dictionary<string, WSManServerRuntime>();
+            this.runtime = new Dictionary<string, WSManRuntime>();
         }
-
-        #region Logging
-        // ID for logging e.g. https://*:59860 (for server level logging)
-        public string Id
-        {
-            get { return string.Format("{0}://{1}:{2}", proto, "*", port); }
-        }
-
-        public void LogInformation(string msg)
-        {
-            logger.LogInformation(string.Format("{0} {1}", Id, msg));
-        }
-
-        public void LogDebug(string msg)
-        {
-            logger.LogDebug(string.Format("{0} {1}", Id, msg));
-        }
-
-        public void LogWarning(string msg)
-        {
-            logger.LogWarning(string.Format("{0} {1}", Id, msg));
-        }
-
-        public void LogError(string msg)
-        {
-            logger.LogError(string.Format("{0} {1}", Id, msg));
-        }
-        #endregion Logging
 
         /// <summary>
         /// Handle Wsman protocol request 
@@ -158,13 +160,13 @@ namespace CloudOSTunnel.Services.WSMan
 
             if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create")
             {
-                response = WSManServerRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
+                response = WSManRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command")
             {
                 // Generate a command id and create runtime
                 string commandId = "" + Guid.NewGuid();
-                var wsmanRuntime = new WSManServerRuntime(loggerFactory, Client, port, commandId, Id);
+                var wsmanRuntime = new WSManRuntime(loggerFactory, Client, port, commandId, Id);
                 runtime.Add(commandId, wsmanRuntime);
 
                 response = wsmanRuntime.HandleExecuteCommandAction(xml);
@@ -188,7 +190,7 @@ namespace CloudOSTunnel.Services.WSMan
             }
             else if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete")
             {
-                response = WSManServerRuntime.HandleDeleteShellAction(xml, this);
+                response = WSManRuntime.HandleDeleteShellAction(xml, this);
             }
             else
             {

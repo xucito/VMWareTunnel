@@ -15,7 +15,7 @@ using CloudOSTunnel.Services.WSMan;
 
 namespace CloudOSTunnel.Clients
 {
-    public partial class VMWareClient : IDisposable, IWSManLogging
+    public partial class VMWareClient : IDisposable, IWSManLogging<VMWareClient>
     {
         #region vCenter Attributes
         private readonly GuestOperationsManager guest;
@@ -51,7 +51,7 @@ namespace CloudOSTunnel.Clients
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
             string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
-            this.logger = loggerFactory.CreateLogger<VMWareClient>();
+            this.Logger = loggerFactory.CreateLogger<VMWareClient>();
             this._serviceUrl = serviceUrl;
 
             client = new VimClientImpl();
@@ -131,7 +131,7 @@ namespace CloudOSTunnel.Clients
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
             string vmUsername, string vmPassword, string moref)
         {
-            this.logger = loggerFactory.CreateLogger<VMWareClient>();
+            this.Logger = loggerFactory.CreateLogger<VMWareClient>();
             this._serviceUrl = serviceUrl;
 
             client = new VimClientImpl();

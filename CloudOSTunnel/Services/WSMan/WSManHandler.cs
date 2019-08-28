@@ -15,9 +15,8 @@ using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
-    public class WSManHandler : IWSManLogging
+    public class WSManHandler : IWSManLogging<WSManHandler>
     {
-        private ILogger<WSManHandler> logger;
         private WSManServer wsmanServer;
         private readonly string proto;
         private readonly int port;
@@ -25,7 +24,7 @@ namespace CloudOSTunnel.Services.WSMan
 
         public WSManHandler(ILoggerFactory loggerFactory, WSManServer wsmanServer, string proto, int port, string vmUser, string vmPassword)
         {
-            this.logger = loggerFactory.CreateLogger<WSManHandler>();
+            this.Logger = loggerFactory.CreateLogger<WSManHandler>();
             this.wsmanServer = wsmanServer;
             this.proto = proto;
             this.port = port;
@@ -38,24 +37,26 @@ namespace CloudOSTunnel.Services.WSMan
             get { return string.Format("{0}://{1}:{2}", proto, "*", port); }
         }
 
+        public ILogger<WSManHandler> Logger { get; private set; }
+
         public void LogInformation(string msg)
         {
-            logger.LogInformation(string.Format("{0} {1}", Id, msg));
+            Logger.LogInformation(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogDebug(string msg)
         {
-            logger.LogDebug(string.Format("{0} {1}", Id, msg));
+            Logger.LogDebug(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogWarning(string msg)
         {
-            logger.LogWarning(string.Format("{0} {1}", Id, msg));
+            Logger.LogWarning(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogError(string msg)
         {
-            logger.LogError(string.Format("{0} {1}", Id, msg));
+            Logger.LogError(string.Format("{0} {1}", Id, msg));
         }
         #endregion Logging
 

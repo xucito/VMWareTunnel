@@ -11,7 +11,7 @@ using System.Net;
 
 namespace CloudOSTunnel.Clients
 {
-    public partial class VMWareClient : IDisposable, IWSManLogging
+    public partial class VMWareClient : IDisposable, IWSManLogging<VMWareClient>
     {
         #region Constants
         //private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 60;
@@ -32,7 +32,6 @@ namespace CloudOSTunnel.Clients
         }
 
         #region Logging
-        private ILogger<VMWareClient> logger;
         public string Id
         {
             get
@@ -40,24 +39,27 @@ namespace CloudOSTunnel.Clients
                 return string.Format("{0}:{1}", _serviceUrl, FullVMName);
             }
         }
+
+        public ILogger<VMWareClient> Logger { get; private set; }
+
         public void LogInformation(string msg)
         {
-            logger.LogInformation(string.Format("{0} {1}", Id, msg));
+            Logger.LogInformation(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogWarning(string msg)
         {
-            logger.LogWarning(string.Format("{0} {1}", Id, msg));
+            Logger.LogWarning(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogDebug(string msg)
         {
-            logger.LogDebug(string.Format("{0} {1}", Id, msg));
+            Logger.LogDebug(string.Format("{0} {1}", Id, msg));
         }
 
         public void LogError(string msg)
         {
-            logger.LogError(string.Format("{0} {1}", Id, msg));
+            Logger.LogError(string.Format("{0} {1}", Id, msg));
         }
         #endregion Logging
 
@@ -321,8 +323,8 @@ namespace CloudOSTunnel.Clients
                 {
                     // Further examine encoded commands when needed
                     // win_reboot that contains Restart-Computer/shutdown must run async because it will lose contact with guest agent
-                    string innerEncodedCommand = WSManServerRuntime.GetCommandInput(command, "-EncodedCommand");
-                    string innerDecodedCommand = WSManServerRuntime.DecodeCommand(innerEncodedCommand, WSManServerRuntime.CommandType.InvokeCommand);
+                    string innerEncodedCommand = WSManRuntime.GetCommandInput(command, "-EncodedCommand");
+                    string innerDecodedCommand = WSManRuntime.DecodeCommand(innerEncodedCommand, WSManRuntime.CommandType.InvokeCommand);
 
                     LogInformation("InnerDecodedCommand: " + innerDecodedCommand);
 
