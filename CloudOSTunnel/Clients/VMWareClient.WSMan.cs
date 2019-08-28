@@ -156,12 +156,15 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Invoke a process in windows guest to run command
+        /// Invoke a command in windows guest
         /// </summary>
         /// <param name="command"></param>
         /// <param name="wait"></param>
+        /// <param name="stdoutPathGuest"></param>
+        /// <param name="stderrPathGuest"></param>
         /// <returns></returns>
-        private int InvokeWindowsGuestProcess(string command, bool wait)
+        private CommandResult InvokeWindowsCommand(string command, bool wait, 
+            string stdoutPathGuest = null, string stderrPathGuest = null)
         {
             processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
@@ -173,19 +176,45 @@ namespace CloudOSTunnel.Clients
             });
 
             int exitCode;
+            bool hasOutput = false;
+            string stdout, stderr;
+
+            stdout = stderr = null;
 
             if (wait)
             {
                 AwaitProcess(pid, out exitCode);
+                if (stdoutPathGuest != null)
+                {
+                    LogInformation("Getting output and error from guest");
+                    stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
+                    LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
+                    hasOutput = true;
+                }
+                if (stderrPathGuest != null)
+                {
+                    stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
+                    LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
+                    hasOutput = true;
+                }
             }
             else
             {
                 // Assume success if no wait
                 exitCode = 0;
+                stdout = stderr = null;
+                hasOutput = false;
             }
 
-            return exitCode;
+            return new CommandResult
+            {
+                exitCode = exitCode,
+                stdout = stdout,
+                stderr = stderr,
+                hasOutput = hasOutput
+            };
         }
+
 
         /// <summary>
         /// Formulate the full powershell command line
@@ -194,7 +223,7 @@ namespace CloudOSTunnel.Clients
         /// <param name="stdoutPath"></param>
         /// <param name="stderrPath"></param>
         /// <returns></returns>
-        private string GetFullCommand(string psCommand, string stdoutPath = null, string stderrPath = null)
+        private string GetFullWindowsCommand(string psCommand, string stdoutPath = null, string stderrPath = null)
         {
             string fullCommand = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{{0}}}""", psCommand);
             if(stdoutPath != null)
@@ -213,14 +242,15 @@ namespace CloudOSTunnel.Clients
         /// </summary>
         /// <param name="guestPaths"></param>
         /// <returns></returns>
-        private int DeleteWindowsGuestFiles(string[] guestPaths)
+        private CommandResult DeleteWindowsGuestFiles(string[] guestPaths)
         {
             if (guestPaths == null || guestPaths.Length == 0)
                 throw new WSManException("Windows guest files to clean up must be specified");
 
-            string fullCommand = GetFullCommand("Remove-Item -Path " + string.Join(",", guestPaths) + " -Confirm:$false");
-            LogInformation("Clearing files in Windows guest");
-            return InvokeWindowsGuestProcess(fullCommand, true);
+            string path = string.Join(",", guestPaths);
+            string fullCommand = GetFullWindowsCommand("Remove-Item -Path " + path + " -Confirm:$false");
+            LogInformation(string.Format("Deleting files in Windows guest {0}", path));
+            return InvokeWindowsCommand(fullCommand, true);
         }
 
         /// <summary>
@@ -234,31 +264,17 @@ namespace CloudOSTunnel.Clients
             string stderrPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stderr.txt");
 
             // To support script block, -Command must be in the format of: -Command "& {command}"
-            //string invoker = string.Format(@"PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ""& {{{0}}}"" 1>{1} 2>{2}",
-            ///    command, stdoutPathGuest, stderrPathGuest);
-            string invoker = GetFullCommand(command, stdoutPathGuest, stderrPathGuest);
+            string fullCommand = GetFullWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
 
-            LogInformation(invoker);
+            LogInformation(fullCommand);
 
             // Invoke command and get result
-            int exitCode = InvokeWindowsGuestProcess(invoker, true);
-            LogInformation("Getting output and error from guest");
-            string stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
-            string stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
-            LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
-            LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
-            bool hasOutput = true;
+            var result = InvokeWindowsCommand(fullCommand, true, stdoutPathGuest, stderrPathGuest);
 
             // Delete temp files
             DeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
 
-            return new CommandResult
-            {
-                exitCode = exitCode,
-                hasOutput = hasOutput,
-                stdout = stdout,
-                stderr = stderr
-            };
+            return result;
         }
 
         /// <summary>
@@ -287,9 +303,6 @@ namespace CloudOSTunnel.Clients
                 return shutdownLine != null || restartLine != null;
             }
 
-            int exitCode;
-            bool hasOutput;
-            string stdout, stderr;
             string invoker;
             bool isReboot = false;
 
@@ -344,7 +357,7 @@ namespace CloudOSTunnel.Clients
                     if (!base64Payload)
                     {
                         // Single command e.g. (Get-WmiObject -ClassName Win32_OperatingSystem).LastBootUpTime
-                        invoker = GetFullCommand(command, stdoutPathGuest, stderrPathGuest);
+                        invoker = GetFullWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
                         filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
                     }
                     else
@@ -365,7 +378,7 @@ namespace CloudOSTunnel.Clients
                     // Command: PowerShell -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -EncodedCommand XXX
                     // Note: -NoProfile must be used in the out-most PowerShell
                     string psCommand = string.Format("Get-Content {0} | {1}", payloadPathGuest, command);
-                    invoker = GetFullCommand(psCommand, stdoutPathGuest, stderrPathGuest);
+                    invoker = GetFullWindowsCommand(psCommand, stdoutPathGuest, stderrPathGuest);
                     filesToDelete = new string[] { payloadPathGuest, stdoutPathGuest, stderrPathGuest };
                 }
                 else if (command.StartsWith("begin", StringComparison.OrdinalIgnoreCase))
@@ -382,7 +395,7 @@ namespace CloudOSTunnel.Clients
                         // Call command script file, then pipe payload into it
                         // Note: -NoProfile must be used in the out-most PowerShell
                         string psCommand = string.Format("Get-Content {0} | {1}", payloadPathGuest, cmdPathGuest);
-                        invoker = GetFullCommand(psCommand, stdoutPathGuest, stderrPathGuest);
+                        invoker = GetFullWindowsCommand(psCommand, stdoutPathGuest, stderrPathGuest);
                         filesToDelete = new string[] { payloadPathGuest, cmdPathGuest, stdoutPathGuest, stderrPathGuest };
                     }
                     else
@@ -398,45 +411,22 @@ namespace CloudOSTunnel.Clients
 
             LogInformation(invoker);
 
-            /*
-            // Debug invoker
-            string invokerPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_invoker.ps1");
-            string invokerPathServer = Path.Join(Path.GetTempPath(), filePrefix + "_invoker.ps1");
-            await UploadFile(invoker, invokerPathServer, invokerPathGuest); */
-
             // Invoke and get output
+            CommandResult result;
             if (isReboot)
             {
                 // Reboot must not wait because guest agent will lose contact. This expects 0 exit code
-                exitCode = InvokeWindowsGuestProcess(invoker, false);
-                stdout = stderr = null;
-                hasOutput = false;
+                result = InvokeWindowsCommand(invoker, false);
             }
             else
             {
                 // Invoke command and wait for completion
-                exitCode = InvokeWindowsGuestProcess(invoker, true);
-                if(exitCode != 0)
-                {
-                    Console.WriteLine();
-                }
-                LogInformation("Getting output and error from guest");
-                stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
-                stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
-                LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
-                LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
-                hasOutput = true;
+                result = InvokeWindowsCommand(invoker, true, stdoutPathGuest, stderrPathGuest);
                 // Delete temp files
                 DeleteWindowsGuestFiles(filesToDelete);
             }
 
-            return new CommandResult
-            {
-                exitCode = exitCode,
-                hasOutput = hasOutput,
-                stdout = stdout,
-                stderr = stderr
-            };
+            return result;
         }
 
         public void Dispose()
