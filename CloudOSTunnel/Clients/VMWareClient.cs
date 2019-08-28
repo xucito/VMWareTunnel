@@ -49,9 +49,8 @@ namespace CloudOSTunnel.Clients
         #endregion Linux Variables
 
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
-            string vmRootUsername, string vmRootPassword, string vmName, string moref, bool debug)
+            string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
-            this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
             this._serviceUrl = serviceUrl;
 
@@ -130,9 +129,8 @@ namespace CloudOSTunnel.Clients
         }
 
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
-            string vmUsername, string vmPassword, string moref, bool debug)
+            string vmUsername, string vmPassword, string moref)
         {
-            this.debug = debug;
             this.logger = loggerFactory.CreateLogger<VMWareClient>();
             this._serviceUrl = serviceUrl;
 
