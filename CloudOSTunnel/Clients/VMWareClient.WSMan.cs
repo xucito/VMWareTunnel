@@ -128,10 +128,13 @@ namespace CloudOSTunnel.Clients
         /// </summary>
         /// <param name="commandId"></param>
         /// <returns></returns>
-        private string GetWsmanFilePrefix(string commandId)
+        private string GetWsmanFilePrefix(string commandId = null)
         {
             string vmPrefix = FullVMName.Trim().Split(" ")[0];
-            return string.Format("{0}_{1}", vmPrefix, commandId);
+            if (commandId != null)
+                return string.Format("{0}_{1}", vmPrefix, commandId);
+            else
+                return vmPrefix;
         }
 
         /// <summary>
@@ -260,8 +263,9 @@ namespace CloudOSTunnel.Clients
         /// <returns></returns>
         public CommandResult ExecuteWindowsCommand(string command)
         {
-            string stdoutPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stdout.txt");
-            string stderrPathGuest = Path.Join(windowsGuestRoot, FullVMName + "_stderr.txt");
+            string vmPrefix = GetWsmanFilePrefix();
+            string stdoutPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stdout.txt");
+            string stderrPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stderr.txt");
 
             // To support script block, -Command must be in the format of: -Command "& {command}"
             string fullCommand = GetFullWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
