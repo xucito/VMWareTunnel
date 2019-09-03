@@ -9,11 +9,13 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using Microsoft.Extensions.Logging;
 using VMware.Vim;
+using CloudOSTunnel.Services.WSMan;
 
 namespace CloudOSTunnel.Clients
 {
-    public class VMWareClient
+    public partial class VMWareClient : IDisposable, IWSManLogging<VMWareClient>
     {
         private GuestOperationsManager _guestOperationsManager;
         private GuestOperationsManager GuestOperationsManager
@@ -87,19 +89,26 @@ namespace CloudOSTunnel.Clients
         }
         public readonly string HostName;
         public readonly string MoRef;
+        #endregion vCenter Attributes
+
+        #region Guest Attributes
+        public readonly string HostName;
+        public string GuestFamily { get; }
+        public string GuestFullName { get; }
+        #endregion Guest Attributes
+
+        #region Linux Variables
+        public string EntryMessage { get; set; }
         private string _baseOutputPath = "/tmp/vmwaretunnel-";
-        public string SessionId { get; set; }
+        public int SSHMessageCount = 0;
         public string TempPath { get { return _baseOutputPath; } }
         public bool ExecuteAsRoot { get; set; }
         public string PrivateFileLocation;
         public string PublicKey;
-        public string FullVMName { get; set; }
-        public string EntryMessage { get; set; }
-        public int SSHMessageCount = 0;
-        public string GuestFamily { get; }
-        public string GuestFullName { get; }
+        #endregion Linux Variables
 
-        public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmRootUsername, string vmRootPassword, string vmName, string moref)
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+            string vmRootUsername, string vmRootPassword, string vmName, string moref)
         {
             _serviceUrl = serviceUrl;
             _vCenterUsername = vcenterUsername;
@@ -144,6 +153,10 @@ namespace CloudOSTunnel.Clients
                 throw new Exception(vmName + " not found.");
             }
 
+            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
+            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
+            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
+
             SessionId = RandomString(6, true);
             _baseOutputPath = _baseOutputPath + SessionId;
 
@@ -153,20 +166,33 @@ namespace CloudOSTunnel.Clients
                 Password = vmRootPassword
             };
 
-            ExecuteAsRoot = true;
+            if (!GuestFamily.ToLower().Contains("window"))
+            {
+                SessionId = RandomString(6, true);
+                _baseOutputPath = _baseOutputPath + SessionId;
 
-            SetupKey();
-            EntryMessage = ExecuteCommand("sleep 0", out _, out _);
-            EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
-            //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
-            SSHMessageCount = EntryMessage.Count();
-            HostName = ExecuteCommand("hostname", out _, out _);
-            var test = ExecuteCommand("sleep 0", out _, out _);
-            //HostName = HostName.Substring(SSHMessageCount);
+                ExecuteAsRoot = true;
+
+                SetupKey();
+                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+                EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
+                //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
+                SSHMessageCount = EntryMessage.Count();
+                HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                var test = ExecuteLinuxCommand("sleep 0", out _, out _);
+                //HostName = HostName.Substring(SSHMessageCount);
+            }
+            else
+            {
+                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+            }
         }
 
-        public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmUsername, string vmPassword, string moref)
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+            string vmUsername, string vmPassword, string moref)
         {
+            this.Logger = loggerFactory.CreateLogger<VMWareClient>();
+            this._serviceUrl = serviceUrl;
 
             _serviceUrl = serviceUrl;
             _vCenterUsername = vcenterUsername;
@@ -181,9 +207,14 @@ namespace CloudOSTunnel.Clients
 
             var foundVM = (VirtualMachine)client.GetView(_vm, null);
 
+            MoRef = moref;
             FullVMName = foundVM.Name;
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
+
+            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
+            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
+            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
             SessionId = RandomString(6, true);
             _baseOutputPath = _baseOutputPath + SessionId;
@@ -194,12 +225,21 @@ namespace CloudOSTunnel.Clients
                 Password = vmPassword
             };
 
-            ExecuteAsRoot = vmUsername == null ? true : false;
+            if (!GuestFamily.ToLower().Contains("window"))
+            {
+                SessionId = RandomString(6, true);
+                _baseOutputPath = _baseOutputPath + SessionId;
 
-            SetupKey();
-            HostName = ExecuteCommand("hostname", out _, out _);
-            EntryMessage = ExecuteCommand("sleep 0", out _, out _);
-            MoRef = moref;
+                ExecuteAsRoot = vmUsername == null ? true : false;
+
+                SetupKey();
+                HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+            }
+            else
+            {
+                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+            }
         }
 
         public void RefreshClient()
@@ -286,7 +326,7 @@ namespace CloudOSTunnel.Clients
             return true;
         }
 
-        public string ExecuteCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
+        public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
         {
             if (commandUniqueIdentifier == null)
             {
@@ -334,7 +374,7 @@ namespace CloudOSTunnel.Clients
             }
         }
 
-        private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string filePath)
+        private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string guestPath)
         {
 
             var result = FileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
@@ -346,15 +386,15 @@ namespace CloudOSTunnel.Clients
             {
                 HttpClient httpClient = new HttpClient(handler);
 
-                var sshOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
+                var fileTransferOutput = httpClient.GetAsync(result.Url).GetAwaiter().GetResult();
 
-                return sshOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                return fileTransferOutput.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             }
         }
 
-        public async Task<string> UploadFile(string filePath, byte[] file, string path)
+        public async Task<string> UploadFile(string serverPath, byte[] file, string guestPath)
         {
-            System.Diagnostics.Debug.WriteLine("Uploading file to " + path);
+            System.Diagnostics.Debug.WriteLine("Uploading file to " + guestPath);
 
             var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
@@ -363,11 +403,13 @@ namespace CloudOSTunnel.Clients
             })
             {
                 HttpClient httpClient = new HttpClient(handler);
+                httpClient.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+
                 ByteArrayContent byteContent = new ByteArrayContent(file);
                 var sshOutput = await httpClient.PutAsync(result, byteContent);
                 if (sshOutput.IsSuccessStatusCode)
                 {
-                    return filePath;
+                    return serverPath;
                 }
                 else
                 {

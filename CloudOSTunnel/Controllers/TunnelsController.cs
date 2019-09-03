@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using CloudOSTunnel.Clients;
 using CloudOSTunnel.Services;
 using CloudOSTunnel.ViewModels;
-using Microsoft.AspNetCore.Mvc;
+using CloudOSTunnel.Services.WSMan;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -15,10 +17,12 @@ namespace CloudOSTunnel.Controllers
     [Route("api/[controller]")]
     public class TunnelsController : Controller
     {
+        private ILoggerFactory loggerFactory;
         GlobalTunnelRouter _router;
-        public TunnelsController(GlobalTunnelRouter router)
+        public TunnelsController(ILoggerFactory loggerFactory, GlobalTunnelRouter router)
         {
-            _router = router;
+            this.loggerFactory = loggerFactory;
+            this._router = router;
         }
 
         [HttpGet]
@@ -74,11 +78,11 @@ namespace CloudOSTunnel.Controllers
                 
                 if ((value.VMName != "" && value.VMName != null))
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
+                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
                 }
                 else if (value.MoRef != "" && value.MoRef != null)
                 {
-                    client = new Clients.VMWareClient(value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
+                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
                 }
                 else
                 {
@@ -106,8 +110,16 @@ namespace CloudOSTunnel.Controllers
                 //Assume windows
                 else
                 {
-                    // Implement windows here
-                    return BadRequest("WINDOWS HAS NOT BEEN IMPLEMENTED");
+                    var wsmanServer = new WSManServer(loggerFactory, client);
+
+                    return Ok(new
+                    {
+                        Port = _router.InitializeTunnel(wsmanServer),
+                        MoRef = client.MoRef,
+                        Hostname = client.HostName,
+                        ElapsedMs = stopwatch.ElapsedMilliseconds,
+                        FullVMName = client.FullVMName
+                    });
                 }
             }
             catch (Exception e)

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
@@ -24,6 +24,39 @@
 
   <ItemGroup>
     <Folder Include="enums\" />
+  </ItemGroup>
+
+</Project>
+    <Compile Remove="enums\**" />
+    <Content Remove="enums\**" />
+    <EmbeddedResource Remove="enums\**" />
+    <None Remove="enums\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FxSsh" Version="1.1.1" />
+    <PackageReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.Razor.Design" Version="2.2.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VimService">
+      <HintPath>packages\VimService.dll</HintPath>
+    </Reference>
+    <Reference Include="VMware.Vim">
+      <HintPath>packages\VMware.Vim.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Certificates\" />
+    <Folder Include="ViewModels\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Certificates\CloudOSTunnel.pfx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
