@@ -23,29 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="enums\" />
-  </ItemGroup>
-
-</Project>
     <Compile Remove="enums\**" />
     <Content Remove="enums\**" />
     <EmbeddedResource Remove="enums\**" />
     <None Remove="enums\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FxSsh" Version="1.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Microsoft.AspNetCore.Razor.Design" Version="2.2.0" PrivateAssets="All" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="VimService">
-      <HintPath>packages\VimService.dll</HintPath>
-    </Reference>
-    <Reference Include="VMware.Vim">
-      <HintPath>packages\VMware.Vim.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
   <ItemGroup>

@@ -93,7 +93,7 @@ namespace CloudOSTunnel.Clients
             {
                 using (FileStream fs = new FileStream(serverPath, FileMode.Open, FileAccess.Read))
                 {
-                    var fileTransferRef = fileManager.InitiateFileTransferToGuest(_vm,
+                    var fileTransferRef = FileManager.InitiateFileTransferToGuest(_vm,
                         _executingCredentials, guestPath,
                         new GuestFileAttributes() { },
                         fs.Length, true);
@@ -148,7 +148,7 @@ namespace CloudOSTunnel.Clients
             GuestProcessInfo[] process;
             do
             {
-                process = processManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
+                process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
                 // Reduce number of calls to vCenter
                 System.Threading.Thread.Sleep(500);
             } while (process.Count() != 1 || process[0].EndTime == null);
@@ -169,9 +169,7 @@ namespace CloudOSTunnel.Clients
         private CommandResult InvokeWindowsCommand(string command, bool wait, 
             string stdoutPathGuest = null, string stderrPathGuest = null)
         {
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-
-            long pid = processManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            long pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = @"cmd.exe",
                 Arguments = "/C " + command,

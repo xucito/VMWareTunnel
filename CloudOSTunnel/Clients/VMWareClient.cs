@@ -89,10 +89,9 @@ namespace CloudOSTunnel.Clients
         }
         public readonly string HostName;
         public readonly string MoRef;
-        #endregion vCenter Attributes
+        public string FullVMName { get; }
 
         #region Guest Attributes
-        public readonly string HostName;
         public string GuestFamily { get; }
         public string GuestFullName { get; }
         #endregion Guest Attributes
@@ -105,6 +104,7 @@ namespace CloudOSTunnel.Clients
         public bool ExecuteAsRoot { get; set; }
         public string PrivateFileLocation;
         public string PublicKey;
+        public string SessionId { get; }
         #endregion Linux Variables
 
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
@@ -152,13 +152,6 @@ namespace CloudOSTunnel.Clients
                 client.Logout();
                 throw new Exception(vmName + " not found.");
             }
-
-            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
-            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
-
-            SessionId = RandomString(6, true);
-            _baseOutputPath = _baseOutputPath + SessionId;
 
             _executingCredentials = new NamePasswordAuthentication()
             {
@@ -211,10 +204,6 @@ namespace CloudOSTunnel.Clients
             FullVMName = foundVM.Name;
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
-
-            guest = (GuestOperationsManager)client.GetView(client.ServiceContent.GuestOperationsManager, null);
-            fileManager = (GuestFileManager)client.GetView(guest.FileManager, null);
-            processManager = (GuestProcessManager)client.GetView(guest.ProcessManager, null);
 
             SessionId = RandomString(6, true);
             _baseOutputPath = _baseOutputPath + SessionId;
@@ -377,7 +366,7 @@ namespace CloudOSTunnel.Clients
         private string ReadFile(ManagedObjectReference vm, NamePasswordAuthentication auth, string guestPath)
         {
 
-            var result = FileManager.InitiateFileTransferFromGuest(_vm, auth, filePath);
+            var result = FileManager.InitiateFileTransferFromGuest(_vm, auth, guestPath);
 
             using (var handler = new HttpClientHandler
             {
@@ -396,7 +385,7 @@ namespace CloudOSTunnel.Clients
         {
             System.Diagnostics.Debug.WriteLine("Uploading file to " + guestPath);
 
-            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
+            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, guestPath, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
