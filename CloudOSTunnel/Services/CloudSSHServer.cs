@@ -60,10 +60,26 @@ namespace CloudOSTunnel.Services
                 channels.Remove(deletionKey);
             }
 
-            _server.Stop();
-            //Logout from vmware
-            _client.Logout();
+            try
+            {
+                _server.Stop();
+                //Logout from vmware
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine("Failed to stop server with error " + e.Message);
+            }
 
+            try
+            {
+                _client.CleanUpLinuxTempFiles();
+                _client.Logout();
+            }
+            catch(Exception e)
+            {
+
+                Console.WriteLine("Failed to stop client with error " + e.Message);
+            }
             //_server.Stop();
         }
 

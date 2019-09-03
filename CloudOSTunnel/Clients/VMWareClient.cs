@@ -165,7 +165,6 @@ namespace CloudOSTunnel.Clients
             //HostName = HostName.Substring(SSHMessageCount);
         }
 
-
         public VMWareClient(string serviceUrl, string vcenterUsername, string vcenterPassword, string vmUsername, string vmPassword, string moref)
         {
 
@@ -247,13 +246,30 @@ namespace CloudOSTunnel.Clients
 
             pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
-                ProgramPath = "/usr/bin/cat",
+                ProgramPath = DoesFileExist("/bin", "cat") ? "/bin/cat" : "/usr/bin/cat",
                 Arguments = _baseOutputPath + "/vmwaretunnelkey.pub >> ~/.ssh/authorized_keys",
                 WorkingDirectory = "/tmp"
             });
 
             AwaitProcess(pid);
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
+        }
+
+        public bool DoesFileExist(string folderPath, string fileName)
+        {
+            var result = FileManager.ListFilesInGuest(_vm, _executingCredentials, folderPath, null, 200, fileName);
+
+            if(result == null)
+            {
+                return false;
+            }
+
+            foreach (var file in result.Files)
+            {
+                Console.WriteLine(file.Path);
+            }
+
+            return result.Files.Where(gfe => gfe.Path == fileName).Count() > 0;
         }
 
         public bool AwaitProcess(long pid)
@@ -362,11 +378,15 @@ namespace CloudOSTunnel.Clients
             }
         }
 
+        public void CleanUpLinuxTempFiles()
+        {
+            FileManager.DeleteDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, true);
+        }
+
         public void Logout()
         {
             try
             {
-                FileManager.DeleteDirectoryInGuest(_vm, _executingCredentials, _baseOutputPath, true);
                 client.Logout();
             }
             catch (Exception e)
