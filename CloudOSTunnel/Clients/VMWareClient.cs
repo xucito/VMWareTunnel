@@ -15,8 +15,9 @@ using CloudOSTunnel.Services.WSMan;
 
 namespace CloudOSTunnel.Clients
 {
-    public partial class VMWareClient : IDisposable, IWSManLogging<VMWareClient>
+    public partial class VMWareClient : IDisposable
     {
+        #region vCenter Attributes
         private GuestOperationsManager _guestOperationsManager;
         private GuestOperationsManager GuestOperationsManager
         {
@@ -90,11 +91,9 @@ namespace CloudOSTunnel.Clients
         public readonly string HostName;
         public readonly string MoRef;
         public string FullVMName { get; }
-
-        #region Guest Attributes
         public string GuestFamily { get; }
         public string GuestFullName { get; }
-        #endregion Guest Attributes
+        #endregion vCenter Attributes
 
         #region Linux Variables
         public string EntryMessage { get; set; }
@@ -269,7 +268,7 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid);
+            AwaitProcess(pid, out _);
 
             PublicKey = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/vmwaretunnelkey.pub");
 
@@ -280,7 +279,7 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid);
+            AwaitProcess(pid, out _);
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
         }
 
@@ -301,16 +300,26 @@ namespace CloudOSTunnel.Clients
             return result.Files.Where(gfe => gfe.Path == fileName).Count() > 0;
         }
 
-        public bool AwaitProcess(long pid)
+        /// <summary>
+        /// Await process and output exit code
+        /// </summary>
+        /// <param name="pid"></param>
+        /// <param name="exitCode"></param>
+        /// <returns></returns>
+        public bool AwaitProcess(long pid, out int exitCode)
         {
-
             GuestProcessInfo[] process;
             do
             {
-                process = ProcessManager.ListProcessesInGuest(_vm,
-                _executingCredentials, new long[] { pid });
-            }
-            while (process.Count() != 1 || process[0].EndTime == null);
+                process = ProcessManager.ListProcessesInGuest(_vm, 
+                    _executingCredentials, new long[] { pid });
+                // Reduce number of calls to vCenter
+                System.Threading.Thread.Sleep(500);
+            } while (process.Count() != 1 || process[0].EndTime == null);
+
+            // If the process was started using StartProgramInGuest then the process exit code 
+            // will be available if queried within 5 minutes after it completes. 
+            exitCode = process[0].ExitCode.Value;
 
             return true;
         }
@@ -338,7 +347,7 @@ namespace CloudOSTunnel.Clients
 
             // Thread.Sleep(1000);
 
-            isComplete = AwaitProcess(pid);
+            isComplete = AwaitProcess(pid, out _);
 
             var files = FileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
 

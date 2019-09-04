@@ -5,28 +5,30 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using VMware.Vim;
-using CloudOSTunnel.Services.WSMan;
 using System.Net.Http;
 using System.Net;
 
+using CloudOSTunnel.Services.WSMan;
+using CloudOSTunnel.Services;
+
 namespace CloudOSTunnel.Clients
 {
-    public partial class VMWareClient : IDisposable, IWSManLogging<VMWareClient>
+    public partial class VMWareClient : IDisposable
     {
-        #region Constants
+        #region Windows Attributes
         //private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 60;
         //private const int GUEST_OPERATIONS_MAX_RETRIES = 3;
         //private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
         // Root path in Windows guest (to store temporal files)
         private const string windowsGuestRoot = @"C:\Users\Public\Documents";
-        #endregion Constants
+        #endregion Windows Attributes
 
-        public string VmUser
+        internal string VmUser
         {
             get { return _executingCredentials.Username; }
         }
 
-        public string VmPassword
+        internal string VmPassword
         {
             get { return _executingCredentials.Password; }
         }
@@ -135,27 +137,6 @@ namespace CloudOSTunnel.Clients
                 return string.Format("{0}_{1}", vmPrefix, commandId);
             else
                 return vmPrefix;
-        }
-
-        /// <summary>
-        /// Await process and output exit code
-        /// </summary>
-        /// <param name="pid"></param>
-        /// <param name="exitCode"></param>
-        /// <returns></returns>
-        public bool AwaitProcess(long pid, out int exitCode)
-        {
-            GuestProcessInfo[] process;
-            do
-            {
-                process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
-                // Reduce number of calls to vCenter
-                System.Threading.Thread.Sleep(500);
-            } while (process.Count() != 1 || process[0].EndTime == null);
-
-            exitCode = process[0].ExitCode.Value;
-
-            return true;
         }
 
         /// <summary>

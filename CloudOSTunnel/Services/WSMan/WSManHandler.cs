@@ -15,7 +15,7 @@ using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
-    public class WSManHandler : IWSManLogging<WSManHandler>
+    public class WSManHandler
     {
         private WSManServer wsmanServer;
         private readonly string proto;

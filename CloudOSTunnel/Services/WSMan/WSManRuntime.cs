@@ -18,7 +18,7 @@ namespace CloudOSTunnel.Services.WSMan
         public bool hasOutput;
     }
 
-    internal class WSManRuntime : IWSManLogging<WSManRuntime>
+    internal class WSManRuntime
     {
         // Reference to the shared vCenter client
         private readonly VMWareClient client;
@@ -203,7 +203,7 @@ namespace CloudOSTunnel.Services.WSMan
         /// </summary>
         /// <param name="xml">XML request</param>
         /// <returns>Wsman protocol response</returns>
-        public static string HandleCreateShellAction(XmlDocument xml, string vmUser, IWSManLogging<WSManServer> logger)
+        public static string HandleCreateShellAction(XmlDocument xml, string vmUser, ILogger<WSManServer> logger)
         {
             // Action 1: Create shell http://schemas.xmlsoap.org/ws/2004/09/transfer/Create
             // Request: <env:Header><w:OperationTimeout>PT9999S</w:OperationTimeout><a:To>http://windows-host:5985/wsman</a:To><w:OptionSet><w:Option Name="WINRS_NOPROFILE">FALSE</w:Option><w:Option Name="WINRS_CODEPAGE">65001</w:Option></w:OptionSet><w:MaxEnvelopeSize mustUnderstand="true">153600</w:MaxEnvelopeSize><w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI><a:Action mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/09/transfer/Create</a:Action><p:DataLocale mustUnderstand="false" xml:lang="en-US"></p:DataLocale><a:ReplyTo><a:Address mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address></a:ReplyTo><a:MessageID>uuid:a9b8312c-2d01-4757-9ef2-9751ddaafd43</a:MessageID><w:Locale mustUnderstand="false" xml:lang="en-US"></w:Locale></env:Header><env:Body><rsp:Shell><rsp:InputStreams>stdin</rsp:InputStreams><rsp:OutputStreams>stdout stderr</rsp:OutputStreams></rsp:Shell></env:Body>
@@ -492,7 +492,7 @@ namespace CloudOSTunnel.Services.WSMan
         /// </summary>
         /// <param name="xml">XML request</param>
         /// <returns>Wsman protocol response</returns>
-        public static string HandleDeleteShellAction(XmlDocument xml, IWSManLogging<WSManServer> logger)
+        public static string HandleDeleteShellAction(XmlDocument xml, ILogger<WSManServer> logger)
         {
             // Action 6: Delete http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete
             // Request: <env:Header><w:OperationTimeout>PT9999S</w:OperationTimeout><a:To>http://windows-host:5985/wsman</a:To><w:SelectorSet><w:Selector Name="ShellId">BB6E9B83-A0BC-4577-B121-ED61CA46EED6</w:Selector></w:SelectorSet><w:MaxEnvelopeSize mustUnderstand="true">153600</w:MaxEnvelopeSize><w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI><a:Action mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete</a:Action><p:DataLocale mustUnderstand="false" xml:lang="en-US"></p:DataLocale><a:ReplyTo><a:Address mustUnderstand="true">http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous</a:Address></a:ReplyTo><a:MessageID>uuid:d48b5f63-9ed8-4007-b086-cef303e813ac</a:MessageID><w:Locale mustUnderstand="false" xml:lang="en-US"></w:Locale></env:Header><env:Body></env:Body>

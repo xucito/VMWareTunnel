@@ -14,7 +14,7 @@ using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
 {
-    public class WSManServer : ITunnel, IWSManLogging<WSManServer>, IDisposable
+    public class WSManServer : ITunnel, IDisposable
     {
         #region Configuration
         private const bool useSsl = true;
@@ -159,7 +159,7 @@ namespace CloudOSTunnel.Services.WSMan
 
             if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create")
             {
-                response = WSManRuntime.HandleCreateShellAction(xml, Client.VmUser, this);
+                response = WSManRuntime.HandleCreateShellAction(xml, Client.VmUser, Logger);
             }
             else if (action == "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command")
             {
@@ -189,7 +189,7 @@ namespace CloudOSTunnel.Services.WSMan
             }
             else if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete")
             {
-                response = WSManRuntime.HandleDeleteShellAction(xml, this);
+                response = WSManRuntime.HandleDeleteShellAction(xml, Logger);
             }
             else
             {
