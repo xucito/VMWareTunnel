@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CloudOSTunnel.Controllers
 {
+    [Route("api/[controller]")]
     public class VMWareController : Controller
     {
         [HttpPost]
@@ -18,6 +19,7 @@ namespace CloudOSTunnel.Controllers
         {
             var client = new VMWareClient(request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
             var result = client.DoesFileExist(request.FolderPath, request.FileName);
+            client.Logout();
             return Ok(new
             {
                 Exists = result

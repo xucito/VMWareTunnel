@@ -168,6 +168,7 @@ namespace CloudOSTunnel.Services
         void service_CommandOpened(object sender, CommandRequestedArgs e, int port)
         {
             System.Diagnostics.Debug.WriteLine($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
+
             if (!channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
                 if (e.CommandText.Split(' ').First() == "scp")

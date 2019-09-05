@@ -240,7 +240,10 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid);
+            if(!AwaitProcess(pid))
+            {
+                Console.WriteLine("Failed to wait till command ended.");
+            }
 
             PublicKey = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/vmwaretunnelkey.pub");
 
@@ -251,7 +254,10 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid);
+            if (!AwaitProcess(pid))
+            {
+                Console.WriteLine("Failed to wait till command ended.");
+            }
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
         }
 
@@ -259,7 +265,7 @@ namespace CloudOSTunnel.Clients
         {
             var result = FileManager.ListFilesInGuest(_vm, _executingCredentials, folderPath, null, 200, fileName);
 
-            if(result == null)
+            if(result.Files == null)
             {
                 return false;
             }
@@ -272,14 +278,19 @@ namespace CloudOSTunnel.Clients
             return result.Files.Where(gfe => gfe.Path == fileName).Count() > 0;
         }
 
-        public bool AwaitProcess(long pid)
+        public bool AwaitProcess(long pid, int timeOutMs = 60000)
         {
-
             GuestProcessInfo[] process;
+            DateTime startTime = DateTime.Now;
             do
             {
+                if((DateTime.Now - startTime).TotalMilliseconds > timeOutMs)
+                {
+                    return false;
+                }
                 process = ProcessManager.ListProcessesInGuest(_vm,
                 _executingCredentials, new long[] { pid });
+                Thread.Sleep(500);
             }
             while (process.Count() != 1 || process[0].EndTime == null);
 
@@ -352,11 +363,11 @@ namespace CloudOSTunnel.Clients
             }
         }
 
-        public async Task<string> UploadFile(string filePath, byte[] file, string path)
+        public async Task<string> UploadFile(string filePath, byte[] file)
         {
-            System.Diagnostics.Debug.WriteLine("Uploading file to " + path);
+            System.Diagnostics.Debug.WriteLine("Uploading file to " + filePath);
 
-            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, path, new GuestFileAttributes() { }, file.LongLength, true);
+            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, filePath, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
