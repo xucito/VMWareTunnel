@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -17,11 +18,11 @@ namespace CloudOSTunnel.Controllers
     [Route("api/[controller]")]
     public class TunnelsController : Controller
     {
-        private ILoggerFactory loggerFactory;
+        private ILoggerFactory _loggerFactory;
         GlobalTunnelRouter _router;
         public TunnelsController(ILoggerFactory loggerFactory, GlobalTunnelRouter router)
         {
-            this.loggerFactory = loggerFactory;
+            this._loggerFactory = loggerFactory;
             this._router = router;
         }
 
@@ -61,6 +62,13 @@ namespace CloudOSTunnel.Controllers
             });
         }
 
+        private static ActionResult Result(HttpStatusCode statusCode, string reason) => new ContentResult
+        {
+            StatusCode = (int)statusCode,
+            Content = $"Status Code: {(int)statusCode}; {statusCode}; {reason}",
+            ContentType = "text/plain",
+        };
+
         // POST api/<controller>
         [HttpPost]
         public IActionResult Post([FromBody]PostTunnelRequestVM value)
@@ -78,11 +86,11 @@ namespace CloudOSTunnel.Controllers
                 
                 if ((value.VMName != "" && value.VMName != null))
                 {
-                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
+                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
                 }
                 else if (value.MoRef != "" && value.MoRef != null)
                 {
-                    client = new Clients.VMWareClient(loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
+                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
                 }
                 else
                 {
@@ -110,7 +118,7 @@ namespace CloudOSTunnel.Controllers
                 //Assume windows
                 else
                 {
-                    var wsmanServer = new WSManServer(loggerFactory, client);
+                    var wsmanServer = new WSManServer(_loggerFactory, client);
 
                     return Ok(new
                     {
@@ -130,11 +138,7 @@ namespace CloudOSTunnel.Controllers
                 }
                 else
                 {
-                    return BadRequest(new ExceptionResult()
-                    {
-                        Message = e.Message,
-                        ExceptionName = e.GetType().Name
-                    });
+                    return Result(HttpStatusCode.InternalServerError, e.Message);
                 }
             }
 

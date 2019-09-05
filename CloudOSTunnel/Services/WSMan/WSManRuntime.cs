@@ -40,8 +40,7 @@ namespace CloudOSTunnel.Services.WSMan
         // Shell ID assigned by server (used throughout the protocol lifetime)
         // Note: Not used because there is no runtime shell created
         internal const string SHELL_ID = "00000000-0000-0000-0000-000000000000";
-        // Command ID assigned by server (used throughout the protocol lifetime)
-        // internal const string COMMAND_ID = "11111111-1111-1111-1111-111111111111";
+        // Example command ID format: "11111111-1111-1111-1111-111111111111"
         // Client IP (dummy ip to fill wsman protocol, likely not used at all)
         internal const string CLIENT_IP = "127.0.0.1";
         // Standard invoke command
