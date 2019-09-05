@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
@@ -22,7 +22,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="enums\" />
+    <Compile Remove="enums\**" />
+    <Content Remove="enums\**" />
+    <EmbeddedResource Remove="enums\**" />
+    <None Remove="enums\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Certificates\" />
+    <Folder Include="ViewModels\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Certificates\CloudOSTunnel.pfx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
