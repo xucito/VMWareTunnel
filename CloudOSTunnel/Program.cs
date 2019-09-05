@@ -22,7 +22,6 @@ namespace CloudOSTunnel
             {
 
             }
-            Console.ReadLine();
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>

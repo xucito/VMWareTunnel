@@ -102,7 +102,7 @@ namespace CloudOSTunnel.Controllers
                 //if linux
                 if (!client.GuestFamily.ToLower().Contains("window"))
                 {
-                    var server = new CloudSSHServer(client);
+                    var server = new CloudSSHServer(_loggerFactory, client);
                     return Ok(new
                     {
                         Port = _router.InitializeTunnel(server),

@@ -868,7 +868,7 @@ namespace CloudOSTunnel.Clients
             }
             catch (Exception e)
             {
-                Console.WriteLine("Failed to end session correctly, check " + _vm.Value + " at directory " + _baseOutputPath);
+                LogError("Failed to end session correctly, check " + _vm.Value + " at directory " + _baseOutputPath);
             }
         }
 

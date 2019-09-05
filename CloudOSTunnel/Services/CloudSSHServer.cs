@@ -1,7 +1,4 @@
-﻿using CloudOSTunnel.Clients;
-using CloudOSTunnel.Services.Handlers;
-using CloudOSTunnel.Utilities;
-using FxSsh;
+﻿using FxSsh;
 using FxSsh.Services;
 using System;
 using System.Collections.Generic;
@@ -9,6 +6,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using CloudOSTunnel.Clients;
+using CloudOSTunnel.Services.Handlers;
+using CloudOSTunnel.Utilities;
 
 namespace CloudOSTunnel.Services
 {
@@ -23,8 +24,41 @@ namespace CloudOSTunnel.Services
         public string Hostname { get { return _client.HostName; } }
         public string Reference { get { return _client.MoRef; } }
 
-        public CloudSSHServer(VMWareClient client)
-        { 
+        #region Logging
+        public string Id
+        {
+            get
+            {
+                return string.Format("ssh://*:{0}:{1}", _port, VMWareClient.FullVMName);
+            }
+        }
+
+        public ILogger<CloudSSHServer> Logger { get; private set; }
+
+        public void LogInformation(string msg)
+        {
+            Logger.LogInformation(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogWarning(string msg)
+        {
+            Logger.LogWarning(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogDebug(string msg)
+        {
+            Logger.LogDebug(string.Format("{0} {1}", Id, msg));
+        }
+
+        public void LogError(string msg)
+        {
+            Logger.LogError(string.Format("{0} {1}", Id, msg));
+        }
+        #endregion Logging
+
+        public CloudSSHServer(ILoggerFactory loggerFactory, VMWareClient client)
+        {
+            this.Logger = loggerFactory.CreateLogger<CloudSSHServer>();
             _client = client;
         }
 
@@ -67,7 +101,7 @@ namespace CloudOSTunnel.Services
             }
             catch(Exception e)
             {
-                Console.WriteLine("Failed to stop server with error " + e.Message);
+                LogError("Failed to stop server with error " + e.Message);
             }
 
             try
@@ -78,7 +112,7 @@ namespace CloudOSTunnel.Services
             catch(Exception e)
             {
 
-                Console.WriteLine("Failed to stop client with error " + e.Message);
+                LogError("Failed to stop client with error " + e.Message);
             }
             //_server.Stop();
         }
@@ -88,14 +122,14 @@ namespace CloudOSTunnel.Services
             System.Diagnostics.Debug.WriteLine("Accepted a client.");
             int port = ((StartingInfo)Utility.GetValObjDy(sender, "StartingInfo")).Port;
             e.ServiceRegistered += (ss, ee) => e_ServiceRegistered(ss, ee, port);
-            e.KeysExchanged += (ss, ee) => e_KeysExchanged(ss, ee, port);
+            e.KeysExchanged += (ss, ee) => e_KeysExchanged(ss, ee, port, Logger);
         }
 
-        private static void e_KeysExchanged(object sender, KeyExchangeArgs e, int port)
+        private static void e_KeysExchanged(object sender, KeyExchangeArgs e, int port, ILogger<CloudSSHServer> logger)
         {
             foreach (var keyExchangeAlg in e.KeyExchangeAlgorithms)
             {
-                System.Diagnostics.Debug.WriteLine("Key exchange algorithm: {0}", keyExchangeAlg);
+                logger.LogDebug(string.Format("Key exchange algorithm: {0}", keyExchangeAlg));
             }
         }
 
@@ -122,7 +156,7 @@ namespace CloudOSTunnel.Services
 
         void service_TcpForwardRequest(object sender, TcpRequestArgs e, int port)
         {
-            System.Diagnostics.Debug.WriteLine("Received a request to forward data to {0}:{1}", e.Host, e.Port);
+            LogDebug(string.Format("Received a request to forward data to {0}:{1}", e.Host, e.Port));
 
             var allow = true;
 
@@ -132,7 +166,7 @@ namespace CloudOSTunnel.Services
 
         void service_PtyReceived(object sender, PtyArgs e, int port)
         {
-            System.Diagnostics.Debug.WriteLine("Request to create a PTY received for terminal type {0}", e.Terminal);
+            LogDebug(string.Format("Request to create a PTY received for terminal type {0}", e.Terminal));
 
             if (channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
@@ -150,24 +184,24 @@ namespace CloudOSTunnel.Services
 
         void service_EnvReceived(object sender, EnvironmentArgs e, int port)
         {
-            System.Diagnostics.Debug.WriteLine("Received environment variable {0}:{1}", e.Name, e.Value);
+            LogDebug(string.Format("Received environment variable {0}:{1}", e.Name, e.Value));
         }
 
         void service_Userauth(object sender, UserauthArgs e, int port)
         {
-            System.Diagnostics.Debug.WriteLine("Client {0} fingerprint: {1}.", e.KeyAlgorithm, e.Fingerprint);
+            LogDebug(string.Format("Client {0} fingerprint: {1}.", e.KeyAlgorithm, e.Fingerprint));
 
             e.Result = true;
         }
 
         void PrintOutput(string output)
         {
-            System.Diagnostics.Debug.WriteLine("Foundd output: " + output);
+            LogDebug(string.Format("Foundd output: {0}", output));
         }
 
         void service_CommandOpened(object sender, CommandRequestedArgs e, int port)
         {
-            System.Diagnostics.Debug.WriteLine($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
+            LogDebug($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
             if (!channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
                 if (e.CommandText.Split(' ').First() == "scp")
