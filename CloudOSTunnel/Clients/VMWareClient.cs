@@ -435,11 +435,11 @@ namespace CloudOSTunnel.Clients
         /// <param name="file"></param>
         /// <param name="guestPath"></param>
         /// <returns></returns>
-        public async Task<string> UploadFile(string serverPath, byte[] file, string guestPath)
+        public async Task<string> UploadFile(string serverPath, byte[] file)
         {
-            System.Diagnostics.Debug.WriteLine("Uploading file to " + guestPath);
+            System.Diagnostics.Debug.WriteLine("Uploading file to " + serverPath);
 
-            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, guestPath, new GuestFileAttributes() { }, file.LongLength, true);
+            var result = FileManager.InitiateFileTransferToGuest(_vm, _executingCredentials, serverPath, new GuestFileAttributes() { }, file.LongLength, true);
             using (var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
