@@ -1,4 +1,5 @@
 ﻿using CloudOSTunnel.Clients;
+using FxSsh;
 using FxSsh.Services;
 using System;
 using System.Collections.Generic;
@@ -65,12 +66,18 @@ namespace CloudOSTunnel.Services.Handlers
             {
                 //used to allow contiued communication
                 bool isComplete = false;
-                var result = _client.ExecuteLinuxCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
-                result = result.Replace("Connection to 127.0.0.1 closed.", "");
-                //result = result.Trim(new char[] { '\n', '\r' });
-                //result = result.Replace("This system is  property of Etisalat, and it must  be used", "");
+                var result = _client.ExecuteCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
                 System.Diagnostics.Debug.WriteLine("Got result: " + result);
-                DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
+
+                var finalBytes = Encoding.ASCII.GetBytes(result);
+
+                for (var i = 0; i < finalBytes.Length; i += Session.LocalChannelDataPacketSize)
+                {
+                    var size = finalBytes.Skip(i).Take(i + Session.LocalChannelDataPacketSize <= finalBytes.Length ? Session.LocalChannelDataPacketSize : finalBytes.Length - i).ToArray();
+                    DataReceived?.Invoke(this, size);
+
+                }
+              //  DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
                 EofReceived?.Invoke(this, EventArgs.Empty);
                 if (isComplete)
                     CloseReceived?.Invoke(this, 0);

@@ -502,7 +502,10 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid, out _);
+            if(!AwaitProcess(pid, out _))
+            {
+                Console.WriteLine("Failed to wait till command ended.");
+            }
 
             PublicKey = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/vmwaretunnelkey.pub");
 
@@ -513,8 +516,30 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            AwaitProcess(pid, out _);
+            if (!AwaitProcess(pid, out _))
+            {
+                Console.WriteLine("Failed to wait till command ended.");
+            }
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
+        }
+
+        public bool AwaitProcess(long pid, int timeOutMs = 60000)
+        {
+            GuestProcessInfo[] process;
+            DateTime startTime = DateTime.Now;
+            do
+            {
+                if((DateTime.Now - startTime).TotalMilliseconds > timeOutMs)
+                {
+                    return false;
+                }
+                process = ProcessManager.ListProcessesInGuest(_vm,
+                _executingCredentials, new long[] { pid });
+                Thread.Sleep(500);
+            }
+            while (process.Count() != 1 || process[0].EndTime == null);
+
+            return true;
         }
 
         public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)

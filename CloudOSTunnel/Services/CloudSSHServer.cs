@@ -156,7 +156,7 @@ namespace CloudOSTunnel.Services
 
         void service_TcpForwardRequest(object sender, TcpRequestArgs e, int port)
         {
-            LogDebug(string.Format("Received a request to forward data to {0}:{1}", e.Host, e.Port));
+            System.Diagnostics.Debug.WriteLine("Received a request to forward data to {0}:{1}", e.Host, e.Port);
 
             var allow = true;
 
@@ -166,7 +166,7 @@ namespace CloudOSTunnel.Services
 
         void service_PtyReceived(object sender, PtyArgs e, int port)
         {
-            LogDebug(string.Format("Request to create a PTY received for terminal type {0}", e.Terminal));
+            System.Diagnostics.Debug.WriteLine("Request to create a PTY received for terminal type {0}", e.Terminal);
 
             if (channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
@@ -184,24 +184,25 @@ namespace CloudOSTunnel.Services
 
         void service_EnvReceived(object sender, EnvironmentArgs e, int port)
         {
-            LogDebug(string.Format("Received environment variable {0}:{1}", e.Name, e.Value));
+            System.Diagnostics.Debug.WriteLine("Received environment variable {0}:{1}", e.Name, e.Value);
         }
 
         void service_Userauth(object sender, UserauthArgs e, int port)
         {
-            LogDebug(string.Format("Client {0} fingerprint: {1}.", e.KeyAlgorithm, e.Fingerprint));
+            System.Diagnostics.Debug.WriteLine("Client {0} fingerprint: {1}.", e.KeyAlgorithm, e.Fingerprint);
 
             e.Result = true;
         }
 
         void PrintOutput(string output)
         {
-            LogDebug(string.Format("Foundd output: {0}", output));
+            System.Diagnostics.Debug.WriteLine("Foundd output: " + output);
         }
 
         void service_CommandOpened(object sender, CommandRequestedArgs e, int port)
         {
-            LogDebug($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
+            System.Diagnostics.Debug.WriteLine($"Channel {e.Channel.ServerChannelId} runs {e.ShellType}: \"{e.CommandText}\".");
+
             if (!channels.ContainsKey(GetChannelId(port, e.Channel.ServerChannelId)))
             {
                 if (e.CommandText.Split(' ').First() == "scp")

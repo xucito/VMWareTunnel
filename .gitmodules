@@ -1,0 +1,3 @@
+[submodule "FxSsh"]
+	path = FxSsh
+	url = https://github.com/xucito/FxSsh.git
