@@ -25,7 +25,7 @@ namespace CloudOSTunnel.Controllers
         public IActionResult FileExists([FromBody] GetVMWareFileExists request)
         {
             var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
-            var result = client.DoesFileExist(request.FolderPath, request.FileName);
+            var result = client.FileExist(request.FolderPath, request.FileName);
             client.Logout();
             return Ok(new
             {
