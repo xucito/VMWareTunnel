@@ -312,13 +312,16 @@ namespace CloudOSTunnel.Clients
         /// <returns></returns>
         public bool AwaitProcess(long pid, out int exitCode)
         {
-            GuestProcessInfo[] process;
+            GuestProcessInfo[] process = null;
+
             do
             {
-                process = ProcessManager.ListProcessesInGuest(_vm, 
+                // "operation not allowed" will be thrown if concurrent processes are initiated
+                process = ProcessManager.ListProcessesInGuest(_vm,
                     _executingCredentials, new long[] { pid });
+
                 // Reduce number of calls to vCenter
-                System.Threading.Thread.Sleep(500);
+                Thread.Sleep(500);
             } while (process.Count() != 1 || process[0].EndTime == null);
 
             // If the process was started using StartProgramInGuest then the process exit code 
@@ -376,6 +379,7 @@ namespace CloudOSTunnel.Clients
 
                 ready = supportRebootState.HasValue && supportRebootState.Value;
                 ready = ready && readyState.HasValue && readyState.Value;
+                ready = ready && vm.Guest.ToolsRunningStatus == "guestToolsRunning";
             } while (!ready);
         }
 
@@ -727,7 +731,14 @@ namespace CloudOSTunnel.Clients
 
             stdout = stderr = null;
 
-            if (!isReboot)
+            if (isReboot)
+            {
+                // Assume success for reboot
+                exitCode = 0;
+                stdout = stderr = null;
+                hasOutput = false;
+            }
+            else
             {
                 AwaitProcess(pid, out exitCode);
                 if (stdoutPathGuest != null)
@@ -743,13 +754,6 @@ namespace CloudOSTunnel.Clients
                     LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
                     hasOutput = true;
                 }
-            }
-            else
-            {
-                // Assume success if no wait e.g. reboot
-                exitCode = 0;
-                stdout = stderr = null;
-                hasOutput = false;
             }
 
             return new CommandResult
