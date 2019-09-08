@@ -694,16 +694,21 @@ namespace CloudOSTunnel.Clients
                 }
                 catch(VimException ex)
                 {
-                    // Expected exception, do nothing
-                    LogWarning("The guest operations agent could not be contacted after initiated reboot. No action required.");
+                    if (ex.Message.Contains("The guest operations agent could not be contacted"))
+                    {
+                        // Reboot occasionally causes agent not contactable
+                        LogWarning("The guest operations agent could not be contacted after initiated reboot. No action required.");
+
+                    } else
+                    {
+                        // Throw unexpected exception
+                        throw new CloudOSTunnelException(string.Format("{0} {1}", ex.Message, ex.StackTrace));
+                    }
                 }
-                finally
-                {
-                    // For reboot, always wait for guest shutdown
-                    AwaitGuestShutdown();
-                    // Wait for guest operations to come back after reboot
-                    AwaitGuestOperations();
-                }
+                // Wait for guest shutdown
+                AwaitGuestShutdown();
+                // Wait for guest operations to come back after reboot
+                AwaitGuestOperations();
             }
             else
             {
