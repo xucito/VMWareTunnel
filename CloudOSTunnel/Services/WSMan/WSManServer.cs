@@ -16,9 +16,9 @@ namespace CloudOSTunnel.Services.WSMan
     public class WSManServer : ITunnel, IDisposable
     {
         #region Configuration
-        private const bool useSsl = true;
-        private const string certPath = "Certificates/CloudOSTunnel.pfx";
-        private const string certPassword = "CloudOSTunnel";
+        private readonly bool useSsl;
+        private readonly string certPath;
+        private readonly string certPassword;
         #endregion Configuration
 
         // vCenter client
@@ -134,8 +134,12 @@ namespace CloudOSTunnel.Services.WSMan
         }
         #endregion ITunnel
 
-        public WSManServer(ILoggerFactory loggerFactory, VMWareClient client)
+        public WSManServer(ILoggerFactory loggerFactory, IConfiguration configuration, VMWareClient client)
         {
+            this.useSsl = configuration.GetSection("WSManServer").GetValue<bool>("UseSsl");
+            this.certPath = configuration.GetSection("WSManServer").GetValue<string>("CertPath");
+            this.certPassword = configuration.GetSection("WSManServer").GetValue<string>("CertPassword");
+
             this.Logger = loggerFactory.CreateLogger<WSManServer>();
             this.loggerFactory = loggerFactory;
             this.Client = client;

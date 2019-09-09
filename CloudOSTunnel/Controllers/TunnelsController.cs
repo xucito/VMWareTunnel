@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using CloudOSTunnel.Clients;
 using CloudOSTunnel.Services;
 using CloudOSTunnel.ViewModels;
@@ -18,10 +19,12 @@ namespace CloudOSTunnel.Controllers
     [Route("api/[controller]")]
     public class TunnelsController : Controller
     {
+        private IConfiguration _configuration;
         private ILoggerFactory _loggerFactory;
         GlobalTunnelRouter _router;
-        public TunnelsController(ILoggerFactory loggerFactory, GlobalTunnelRouter router)
+        public TunnelsController(IConfiguration configuration, ILoggerFactory loggerFactory, GlobalTunnelRouter router)
         {
+            this._configuration = configuration;
             this._loggerFactory = loggerFactory;
             this._router = router;
         }
@@ -119,7 +122,7 @@ namespace CloudOSTunnel.Controllers
                 //Assume windows
                 else
                 {
-                    var wsmanServer = new WSManServer(_loggerFactory, client);
+                    var wsmanServer = new WSManServer(_loggerFactory, _configuration, client);
 
                     return Ok(new
                     {
