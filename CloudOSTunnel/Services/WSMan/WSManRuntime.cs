@@ -51,7 +51,7 @@ namespace CloudOSTunnel.Services.WSMan
         // Invoke command from Ansible
         private string command;
         // Record last command from Ansible
-        private string lastCommand;
+        private static string LastCommand;
         // Indicate payload is Base64 encoded
         private bool payloadEncoded;
         // Payload file path
@@ -69,7 +69,7 @@ namespace CloudOSTunnel.Services.WSMan
             this.loggingPrefix = loggingPrefix;
 
             this.payloadBeginTime = this.payloadEndTime = null;
-            this.command = this.lastCommand = null;
+            this.command = null;
             this.payloadEncoded = false;
             this.payloadFile = null;
             this.payloadWriter = null;
@@ -140,7 +140,7 @@ namespace CloudOSTunnel.Services.WSMan
         {
             DeletePayloadWriter();
             command = null;
-            lastCommand = null;
+            LastCommand = null;
         }
         #endregion Payload Writer
 
@@ -280,7 +280,7 @@ namespace CloudOSTunnel.Services.WSMan
             // Then win_reboot will send many duplicate commands which are impossible to handle timely
             // In this case, terminate the server to avoid further problems
             // Resolution: User must shut down tunnel then create a new one
-            if (command == lastCommand && command != STANDARD_WRAPPER_COMMAND)
+            if (command == LastCommand && command != STANDARD_WRAPPER_COMMAND)
             {
                 string msg = string.Format("Duplicate command received: {0}", command);
                 LogWarning(msg);
@@ -289,7 +289,7 @@ namespace CloudOSTunnel.Services.WSMan
             }
 
             // Remember last command
-            lastCommand = command;
+            WSManRuntime.LastCommand = command;
 
             // Reset encoded payload times
             payloadBeginTime = payloadEndTime = null;

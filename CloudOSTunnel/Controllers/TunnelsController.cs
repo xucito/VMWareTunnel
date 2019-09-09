@@ -112,7 +112,8 @@ namespace CloudOSTunnel.Controllers
                         TempFilesPath = client.TempPath,
                         PublicKey = client.PublicKey,
                         PrivateKeyLocation = client.PrivateFileLocation,
-                        FullVMName = client.FullVMName
+                        FullVMName = client.FullVMName,
+                        GuestFamily = client.GuestFamily
                     });
                 }
                 //Assume windows
@@ -126,7 +127,8 @@ namespace CloudOSTunnel.Controllers
                         MoRef = client.MoRef,
                         Hostname = client.HostName,
                         ElapsedMs = stopwatch.ElapsedMilliseconds,
-                        FullVMName = client.FullVMName
+                        FullVMName = client.FullVMName,
+                        GuestFamily = client.GuestFamily
                     });
                 }
             }

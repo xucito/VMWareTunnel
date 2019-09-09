@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-
 using CloudOSTunnel.Clients;
 
 namespace CloudOSTunnel.Services.WSMan
@@ -156,6 +155,29 @@ namespace CloudOSTunnel.Services.WSMan
             // <w:ResourceURI mustUnderstand="true">http://schemas.microsoft.com/wbem/wsman/1/windows/shell/cmd</w:ResourceURI>
             string resourceUri = xml.GetElementsByTagName("w:ResourceURI").Item(0).InnerText;
             string action = xml.GetElementsByTagName("a:Action").Item(0).InnerText;
+
+            // Safe guard actions to run command
+            var actionToGuard = new List<string>() {
+                "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Command",
+                "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Send",
+                "http://schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive"
+            };
+            if (actionToGuard.Contains(action))
+            {
+                // Block request while VM is rebooting
+                if (Client.IsRebooting)
+                {
+                    LogWarning(string.Format("VM is rebooting, block wsman action {0}", action));
+                    return null;
+                }
+
+                // Block request while VM is executing
+                if (Client.IsExecuting)
+                {
+                    LogWarning(string.Format("VM is executing, block wsman action {0}", action));
+                    return null;
+                }
+            }
 
             if (action == "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create")
             {
