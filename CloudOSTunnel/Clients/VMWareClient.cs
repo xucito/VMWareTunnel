@@ -20,12 +20,17 @@ namespace CloudOSTunnel.Clients
 {
     public class VMWareClient : IDisposable
     {
+        public bool IsRebooting { get; private set; }
+        public bool IsExecuting { get; private set; }
+
         #region vCenter Attributes
         // Maximum time for VM guest to stop services and start rebooting
         private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 60;
-        // Maximum time to wait for guest operations to be ready
-        // Note: VMware Tools takes time to load completely and guest operations may experience transient states
-        // during startup: up, down, up, down..up
+        // Maximum time for VM guest to run a program
+        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 120;
+        // Maximum time to wait for guest operations to be ready, note the below:
+        // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
+        // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
         private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 3600;
        
         private GuestOperationsManager _guestOperationsManager;
@@ -168,6 +173,8 @@ namespace CloudOSTunnel.Clients
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
             string vmUsername, string vmPassword, string vmName, string moref)
         {
+            this.IsRebooting = false;
+            this.IsExecuting = false;
             this.Logger = loggerFactory.CreateLogger<VMWareClient>();
 
             _serviceUrl = serviceUrl;
@@ -245,6 +252,8 @@ namespace CloudOSTunnel.Clients
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
             string vmUsername, string vmPassword, string moref)
         {
+            this.IsRebooting = false;
+            this.IsExecuting = false;
             this.Logger = loggerFactory.CreateLogger<VMWareClient>();
 
             _serviceUrl = serviceUrl;
@@ -309,17 +318,23 @@ namespace CloudOSTunnel.Clients
         /// </summary>
         /// <param name="pid">Process ID to await</param>
         /// <param name="exitCode">Exit code of process</param>
-        /// <returns></returns>
-        public bool AwaitProcess(long pid, out int exitCode)
+        /// <param name="timeoutSeconds">Timeout in seconds</param>
+        /// <returns>True if process exited, otherwise false</returns>
+        public bool AwaitProcess(long pid, out int? exitCode, int timeoutSeconds = GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS)
         {
-            GuestProcessInfo[] process = null;
+            GuestProcessInfo[] process;
+            Stopwatch stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             do
             {
+                if (stopWatch.Elapsed.TotalSeconds > timeoutSeconds)
+                {
+                    exitCode = null;
+                    return false;
+                }
                 // "operation not allowed" will be thrown if concurrent processes are initiated
-                process = ProcessManager.ListProcessesInGuest(_vm,
-                    _executingCredentials, new long[] { pid });
-
+                process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
                 // Reduce number of calls to vCenter
                 Thread.Sleep(500);
             } while (process.Count() != 1 || process[0].EndTime == null);
@@ -586,25 +601,6 @@ namespace CloudOSTunnel.Clients
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
         }
 
-        public bool AwaitProcess(long pid, int timeOutMs = 60000)
-        {
-            GuestProcessInfo[] process;
-            DateTime startTime = DateTime.Now;
-            do
-            {
-                if((DateTime.Now - startTime).TotalMilliseconds > timeOutMs)
-                {
-                    return false;
-                }
-                process = ProcessManager.ListProcessesInGuest(_vm,
-                _executingCredentials, new long[] { pid });
-                Thread.Sleep(500);
-            }
-            while (process.Count() != 1 || process[0].EndTime == null);
-
-            return true;
-        }
-
         public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
         {
             if (commandUniqueIdentifier == null)
@@ -682,13 +678,64 @@ namespace CloudOSTunnel.Clients
         private CommandResult InvokeWindowsCommand(string fullCommand, bool isReboot,
             string stdoutPathGuest = null, string stderrPathGuest = null)
         {
-            long pid = -1;
-
-            if(isReboot)
+            if(stdoutPathGuest == null && stderrPathGuest != null)
             {
-                AwaitGuestOperations();
-                try
+                throw new CloudOSTunnelException("Both stdout and stderr need to be specified or neither.");
+            }
+            if (stdoutPathGuest != null && stderrPathGuest == null)
+            {
+                throw new CloudOSTunnelException("Both stdout and stderr need to be specified or neither.");
+            }
+
+            bool hasOutput = stdoutPathGuest != null && stderrPathGuest != null;
+            long pid = -1;
+            int? exitCode;
+            string stdout, stderr;
+
+            try
+            {
+                if (isReboot)
                 {
+                    AwaitGuestOperations();
+                    try
+                    {
+                        // Indicate command execution started
+                        this.IsExecuting = true;
+                        pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+                        {
+                            ProgramPath = @"cmd.exe",
+                            Arguments = "/C " + fullCommand,
+                            WorkingDirectory = windowsGuestRoot
+                        });
+                    }
+                    catch (VimException ex)
+                    {
+                        if (ex.Message.Contains("The guest operations agent could not be contacted"))
+                        {
+                            // Reboot can causes agent not contactable as VMware Tools shutdown too quickly
+                            // - This is expected behavior
+                            LogWarning("The guest operations agent could not be contacted after initiated reboot. No action required.");
+                        }
+                        else
+                        {
+                            // Throw other unexpected exceptions
+                            throw new CloudOSTunnelException(string.Format("{0} {1}", ex.Message, ex.StackTrace));
+                        }
+                    }
+                    // Indicate reboot has started
+                    this.IsRebooting = true;
+                    // Wait for guest to stop VMware Tools and shutdown
+                    AwaitGuestShutdown();
+                    // Wait for guest operations to come back after reboot
+                    AwaitGuestOperations();
+                    // Indicate reboot has completed
+                    this.IsRebooting = false;
+                }
+                else
+                {
+                    AwaitGuestOperations();
+                    // Indicate command execution started
+                    this.IsExecuting = true;
                     pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
                     {
                         ProgramPath = @"cmd.exe",
@@ -696,69 +743,43 @@ namespace CloudOSTunnel.Clients
                         WorkingDirectory = windowsGuestRoot
                     });
                 }
-                catch(VimException ex)
-                {
-                    if (ex.Message.Contains("The guest operations agent could not be contacted"))
-                    {
-                        // Reboot occasionally causes agent not contactable
-                        LogWarning("The guest operations agent could not be contacted after initiated reboot. No action required.");
 
-                    } else
+                if (isReboot)
+                {
+                    // Assume success for reboot
+                    exitCode = 0;
+                    stdout = stderr = null;
+                }
+                else
+                {
+                    stdout = stderr = null;
+                    if (AwaitProcess(pid, out exitCode))
                     {
-                        // Throw unexpected exception
-                        throw new CloudOSTunnelException(string.Format("{0} {1}", ex.Message, ex.StackTrace));
+                        if (stdoutPathGuest != null && stderrPathGuest != null)
+                        {
+                            LogInformation("Getting output and error from guest");
+                            stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
+                            LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
+                            stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
+                            LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
+                        }
+                    }
+                    else
+                    {
+                        throw new CloudOSTunnelException(string.Format("Guest process {0} timed out", pid));
                     }
                 }
-                // Wait for guest shutdown
-                AwaitGuestShutdown();
-                // Wait for guest operations to come back after reboot
-                AwaitGuestOperations();
             }
-            else
+            finally
             {
-                AwaitGuestOperations();
-                pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
-                {
-                    ProgramPath = @"cmd.exe",
-                    Arguments = "/C " + fullCommand,
-                    WorkingDirectory = windowsGuestRoot
-                });
-            }
-
-            int exitCode;
-            bool hasOutput = false;
-            string stdout, stderr;
-
-            stdout = stderr = null;
-
-            if (isReboot)
-            {
-                // Assume success for reboot
-                exitCode = 0;
-                stdout = stderr = null;
-                hasOutput = false;
-            }
-            else
-            {
-                AwaitProcess(pid, out exitCode);
-                if (stdoutPathGuest != null)
-                {
-                    LogInformation("Getting output and error from guest");
-                    stdout = ReadFile(_vm, _executingCredentials, stdoutPathGuest);
-                    LogInformation(string.Format("Obtained guest stdout: {0}", stdout));
-                    hasOutput = true;
-                }
-                if (stderrPathGuest != null)
-                {
-                    stderr = ReadFile(_vm, _executingCredentials, stderrPathGuest);
-                    LogInformation(string.Format("Obtained guest stderr: {0}", stderr));
-                    hasOutput = true;
-                }
+                // Must clear flags before exit
+                this.IsExecuting = false;
+                this.IsRebooting = false;
             }
 
             return new CommandResult
             {
-                exitCode = exitCode,
+                exitCode = exitCode.Value,
                 stdout = stdout,
                 stderr = stderr,
                 hasOutput = hasOutput
