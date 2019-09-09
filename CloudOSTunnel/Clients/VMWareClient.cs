@@ -20,7 +20,9 @@ namespace CloudOSTunnel.Clients
 {
     public class VMWareClient : IDisposable
     {
+        // Indicate VM is rebooting
         public bool IsRebooting { get; private set; }
+        // Indicate VM is executing command
         public bool IsExecuting { get; private set; }
 
         #region vCenter Attributes
