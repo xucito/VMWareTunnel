@@ -27,9 +27,11 @@ namespace CloudOSTunnel.Clients
 
         #region vCenter Attributes
         // Maximum time for VM guest to stop services and start rebooting
-        private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 60;
+        // - Note that after installed updates, it can take long to shutdown
+        private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 1800;
         // Maximum time for VM guest to run a program
-        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 120;
+        // - Note that it can take long to install updates
+        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
         // Maximum time to wait for guest operations to be ready, note the below:
         // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
         // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
@@ -112,7 +114,7 @@ namespace CloudOSTunnel.Clients
         public string GuestFullName { get; }
         #endregion vCenter Attributes
 
-        #region Linux Guest Variables
+        #region Linux Guest Attributes
         public string EntryMessage { get; set; }
         private string _baseOutputPath = "/tmp/vmwaretunnel-";
         public int SSHMessageCount = 0;
@@ -121,7 +123,7 @@ namespace CloudOSTunnel.Clients
         public string PrivateFileLocation;
         public string PublicKey;
         public string SessionId { get; }
-        #endregion Linux Guest Variables
+        #endregion Linux Guest Attributes
 
         #region Windows Guest Attributes
         // Root path in Windows guest (to store temporal files)
