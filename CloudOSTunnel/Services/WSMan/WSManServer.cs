@@ -112,11 +112,14 @@ namespace CloudOSTunnel.Services.WSMan
                         {
                             LogInformation(string.Format("Configuring https web host on port {0}", port));
                             listenOptions.UseHttps(certPath, certPassword);
+                            
                             /*
                             listenOptions.UseHttps(certPath, certPassword,
                                 httpsOptions => {
-                                    httpsOptions.SslProtocols = SslProtocols.Tls12 | SslProtocols.Ssl3;
-                                });*/
+                                    //httpsOptions.SslProtocols = SslProtocols.Tls12 | SslProtocols.Ssl3;
+                                    httpsOptions.SslProtocols = SslProtocols.Ssl3;
+                                }
+                            ); */
                         }
                         else
                         {
