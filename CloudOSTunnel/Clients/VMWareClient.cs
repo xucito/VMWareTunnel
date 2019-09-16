@@ -819,17 +819,17 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Safe delete files in Windows guest
+        /// Delete files in Windows guest
         /// </summary>
         /// <param name="guestPaths">Guest files to delete (does not support folder)</param>
         /// <returns></returns>
-        private CommandResult SafeDeleteWindowsGuestFiles(string[] guestPaths)
+        private CommandResult DeleteWindowsGuestFiles(string[] guestPaths)
         {
             if (guestPaths == null || guestPaths.Length == 0)
                 throw new WSManException("Windows guest files to delete must be specified");
 
             string path = string.Join(",", guestPaths);
-            string fullCommand = WrapWindowsCommand("Remove-Item -Path " + path + " -Confirm:$false -ErrorAction Ignore");
+            string fullCommand = WrapWindowsCommand("Remove-Item -Path " + path + " -Confirm:$false");
             LogInformation(string.Format("Deleting files in Windows guest {0}", path));
             return InvokeWindowsCommand(fullCommand, false);
         }
@@ -853,7 +853,7 @@ namespace CloudOSTunnel.Clients
             var result = InvokeWindowsCommand(fullCommand, false, stdoutPathGuest, stderrPathGuest);
 
             // Delete temp files
-            SafeDeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
+            DeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
 
             return result;
         }
@@ -1012,7 +1012,7 @@ namespace CloudOSTunnel.Clients
             if(filesToDelete != null)
             {
                 // Delete temp files
-                SafeDeleteWindowsGuestFiles(filesToDelete);
+                DeleteWindowsGuestFiles(filesToDelete);
             }
 
             return result;
