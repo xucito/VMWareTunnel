@@ -448,7 +448,7 @@ namespace CloudOSTunnel.Services.WSMan
             string requestMessageId = xml.GetElementsByTagName("a:MessageID").Item(0).InnerText;
             string signalCode = xml.GetElementsByTagName("rsp:Code").Item(0).InnerText;
 
-            LogInformation("Received signal terminate");
+            LogInformation(string.Format("Received signal code {0}", signalCode));
 
             string responseMessageId = "uuid:" + Guid.NewGuid();
 

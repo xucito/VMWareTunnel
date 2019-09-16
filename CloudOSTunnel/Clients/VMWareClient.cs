@@ -691,7 +691,7 @@ namespace CloudOSTunnel.Clients
                 throw new CloudOSTunnelException("Both stdout and stderr need to be specified or neither.");
             }
 
-            bool hasOutput = stdoutPathGuest != null && stderrPathGuest != null;
+            bool hasOutput;
             long pid = -1;
             int? exitCode;
             string stdout, stderr;
@@ -728,12 +728,16 @@ namespace CloudOSTunnel.Clients
                     }
                     // Indicate reboot has started
                     this.IsRebooting = true;
+                    LogInformation("Reboot has started");
                     // Wait for guest to stop VMware Tools and shutdown
                     AwaitGuestShutdown();
+                    LogInformation("Guest is down");
                     // Wait for guest operations to come back after reboot
                     AwaitGuestOperations();
+                    LogInformation("Guest is up");
                     // Indicate reboot has completed
                     this.IsRebooting = false;
+                    LogInformation("Reboot has completed"); 
                 }
                 else
                 {
@@ -753,9 +757,11 @@ namespace CloudOSTunnel.Clients
                     // Assume success for reboot
                     exitCode = 0;
                     stdout = stderr = null;
+                    hasOutput = false;
                 }
                 else
                 {
+                    hasOutput = true;
                     stdout = stderr = null;
                     if (AwaitProcess(pid, out exitCode))
                     {
@@ -881,7 +887,7 @@ namespace CloudOSTunnel.Clients
             string invoker;
             bool isReboot = false;
 
-            string[] filesToDelete;
+            string[] filesToDelete = null;
 
             string filePrefix = GetWsmanFilePrefix(commandId);
 
@@ -920,11 +926,14 @@ namespace CloudOSTunnel.Clients
                     if (isReboot)
                     {
                         LogInformation("InnerDecodedCommand contains reboot");
+                        invoker = command;
                     }
-
-                    // Directly invoke because it starts with PowerShell..
-                    invoker = string.Format("{0} 1>{1} 2>{2}", command, stdoutPathGuest, stderrPathGuest);
-                    filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
+                    else
+                    {
+                        // Directly invoke because it starts with PowerShell..
+                        invoker = string.Format("{0} 1>{1} 2>{2}", command, stdoutPathGuest, stderrPathGuest);
+                        filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
+                    }
                 }
                 else
                 {
@@ -997,6 +1006,10 @@ namespace CloudOSTunnel.Clients
             {
                 // Invoke command and wait for completion
                 result = InvokeWindowsCommand(invoker, isReboot, stdoutPathGuest, stderrPathGuest);
+            }
+
+            if(filesToDelete != null)
+            {
                 // Delete temp files
                 DeleteWindowsGuestFiles(filesToDelete);
             }
