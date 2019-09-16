@@ -819,17 +819,17 @@ namespace CloudOSTunnel.Clients
         }
 
         /// <summary>
-        /// Delete files in Windows guest
+        /// Safe delete files in Windows guest
         /// </summary>
         /// <param name="guestPaths">Guest files to delete (does not support folder)</param>
         /// <returns></returns>
-        private CommandResult DeleteWindowsGuestFiles(string[] guestPaths)
+        private CommandResult SafeDeleteWindowsGuestFiles(string[] guestPaths)
         {
             if (guestPaths == null || guestPaths.Length == 0)
                 throw new WSManException("Windows guest files to delete must be specified");
 
             string path = string.Join(",", guestPaths);
-            string fullCommand = WrapWindowsCommand("Remove-Item -Path " + path + " -Confirm:$false");
+            string fullCommand = WrapWindowsCommand("Remove-Item -Path " + path + " -Confirm:$false -ErrorAction Ignore");
             LogInformation(string.Format("Deleting files in Windows guest {0}", path));
             return InvokeWindowsCommand(fullCommand, false);
         }
@@ -853,7 +853,7 @@ namespace CloudOSTunnel.Clients
             var result = InvokeWindowsCommand(fullCommand, false, stdoutPathGuest, stderrPathGuest);
 
             // Delete temp files
-            DeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
+            SafeDeleteWindowsGuestFiles(new string[] { stdoutPathGuest, stderrPathGuest });
 
             return result;
         }
@@ -941,6 +941,7 @@ namespace CloudOSTunnel.Clients
                     if (!base64Payload)
                     {
                         // Single command e.g. (Get-WmiObject -ClassName Win32_OperatingSystem).LastBootUpTime
+                        isReboot = IsRebootCommand(command);
                         invoker = WrapWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
                         filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
                     }
@@ -1011,7 +1012,7 @@ namespace CloudOSTunnel.Clients
             if(filesToDelete != null)
             {
                 // Delete temp files
-                DeleteWindowsGuestFiles(filesToDelete);
+                SafeDeleteWindowsGuestFiles(filesToDelete);
             }
 
             return result;
