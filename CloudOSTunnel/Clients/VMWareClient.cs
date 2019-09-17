@@ -332,21 +332,37 @@ namespace CloudOSTunnel.Clients
         /// <returns>True if process exited, otherwise false</returns>
         public bool AwaitProcess(long pid, out int? exitCode, int timeoutSeconds = GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS)
         {
-            GuestProcessInfo[] process;
+            GuestProcessInfo[] process = null;
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
 
             do
             {
+                // Reduce number of calls to vCenter
+                Thread.Sleep(500);
+
                 if (stopWatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
                     exitCode = null;
                     return false;
                 }
-                // "operation not allowed" will be thrown if concurrent processes are initiated
-                process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
-                // Reduce number of calls to vCenter
-                Thread.Sleep(500);
+                try
+                {
+                    // "The operation is not allowed in the current state" will be thrown on occassion
+                    process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
+                }
+                catch(VimException ex)
+                {
+                    if(ex.Message.Contains("The operation is not allowed in the current state"))
+                    {
+                        LogWarning("Encountered operation not allowed while awaiting process, ignore and retry");
+                        continue;
+                    }
+                    else
+                    {
+                        throw ex;
+                    }
+                }
             } while (process.Count() != 1 || process[0].EndTime == null);
 
             // If the process was started using StartProgramInGuest then the process exit code 
