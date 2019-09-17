@@ -129,6 +129,12 @@ namespace CloudOSTunnel.Clients
         // Root path in Windows guest (to store temporal files)
         private const string windowsGuestRoot = @"C:\Users\Public\Documents";
 
+        // Get Windows guest full path for a file name
+        private string GetWindowsGuestPath(string filename)
+        {
+            return string.Format(@"{0}\{1}", windowsGuestRoot, filename);
+        }
+
         internal string VmUser
         {
             get { return _executingCredentials.Username; }
@@ -842,8 +848,9 @@ namespace CloudOSTunnel.Clients
         public CommandResult ExecuteWindowsCommand(string command)
         {
             string vmPrefix = GetWsmanFilePrefix();
-            string stdoutPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stdout.txt");
-            string stderrPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stderr.txt");
+            
+            string stdoutPathGuest = GetWindowsGuestPath(vmPrefix + "_stdout.txt");
+            string stderrPathGuest = GetWindowsGuestPath(vmPrefix + "_stderr.txt");
 
             string fullCommand = WrapWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
 
@@ -891,10 +898,10 @@ namespace CloudOSTunnel.Clients
 
             string filePrefix = GetWsmanFilePrefix(commandId);
 
-            string stdoutPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_stdout.txt");
-            string stderrPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_stderr.txt");
-            string payloadPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_payload.txt");
-            string cmdPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_command.ps1");
+            string stdoutPathGuest = GetWindowsGuestPath(filePrefix + "_stdout.txt");
+            string stderrPathGuest = GetWindowsGuestPath(filePrefix + "_stderr.txt");
+            string payloadPathGuest = GetWindowsGuestPath(filePrefix + "_payload.txt");
+            string cmdPathGuest = GetWindowsGuestPath(filePrefix + "_command.ps1");
 
             string cmdPathServer = Path.Join(Path.GetTempPath(), port + "_command.ps1");
 
