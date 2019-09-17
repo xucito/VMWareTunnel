@@ -27,9 +27,11 @@ namespace CloudOSTunnel.Clients
 
         #region vCenter Attributes
         // Maximum time for VM guest to stop services and start rebooting
-        private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 60;
+        // - Note that after installed updates, it can take long to shutdown
+        private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 1800;
         // Maximum time for VM guest to run a program
-        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 120;
+        // - Note that it can take long to install updates
+        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
         // Maximum time to wait for guest operations to be ready, note the below:
         // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
         // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
@@ -112,7 +114,7 @@ namespace CloudOSTunnel.Clients
         public string GuestFullName { get; }
         #endregion vCenter Attributes
 
-        #region Linux Guest Variables
+        #region Linux Guest Attributes
         public string EntryMessage { get; set; }
         private string _baseOutputPath = "/tmp/vmwaretunnel-";
         public int SSHMessageCount = 0;
@@ -121,7 +123,7 @@ namespace CloudOSTunnel.Clients
         public string PrivateFileLocation;
         public string PublicKey;
         public string SessionId { get; }
-        #endregion Linux Guest Variables
+        #endregion Linux Guest Attributes
 
         #region Windows Guest Attributes
         // Root path in Windows guest (to store temporal files)
@@ -689,7 +691,7 @@ namespace CloudOSTunnel.Clients
                 throw new CloudOSTunnelException("Both stdout and stderr need to be specified or neither.");
             }
 
-            bool hasOutput = stdoutPathGuest != null && stderrPathGuest != null;
+            bool hasOutput;
             long pid = -1;
             int? exitCode;
             string stdout, stderr;
@@ -726,12 +728,16 @@ namespace CloudOSTunnel.Clients
                     }
                     // Indicate reboot has started
                     this.IsRebooting = true;
+                    LogInformation("Reboot has started");
                     // Wait for guest to stop VMware Tools and shutdown
                     AwaitGuestShutdown();
+                    LogInformation("Guest is down");
                     // Wait for guest operations to come back after reboot
                     AwaitGuestOperations();
+                    LogInformation("Guest is up");
                     // Indicate reboot has completed
                     this.IsRebooting = false;
+                    LogInformation("Reboot has completed"); 
                 }
                 else
                 {
@@ -751,9 +757,11 @@ namespace CloudOSTunnel.Clients
                     // Assume success for reboot
                     exitCode = 0;
                     stdout = stderr = null;
+                    hasOutput = false;
                 }
                 else
                 {
+                    hasOutput = true;
                     stdout = stderr = null;
                     if (AwaitProcess(pid, out exitCode))
                     {
@@ -879,7 +887,7 @@ namespace CloudOSTunnel.Clients
             string invoker;
             bool isReboot = false;
 
-            string[] filesToDelete;
+            string[] filesToDelete = null;
 
             string filePrefix = GetWsmanFilePrefix(commandId);
 
@@ -918,11 +926,14 @@ namespace CloudOSTunnel.Clients
                     if (isReboot)
                     {
                         LogInformation("InnerDecodedCommand contains reboot");
+                        invoker = command;
                     }
-
-                    // Directly invoke because it starts with PowerShell..
-                    invoker = string.Format("{0} 1>{1} 2>{2}", command, stdoutPathGuest, stderrPathGuest);
-                    filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
+                    else
+                    {
+                        // Directly invoke because it starts with PowerShell..
+                        invoker = string.Format("{0} 1>{1} 2>{2}", command, stdoutPathGuest, stderrPathGuest);
+                        filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
+                    }
                 }
                 else
                 {
@@ -995,6 +1006,10 @@ namespace CloudOSTunnel.Clients
             {
                 // Invoke command and wait for completion
                 result = InvokeWindowsCommand(invoker, isReboot, stdoutPathGuest, stderrPathGuest);
+            }
+
+            if(filesToDelete != null)
+            {
                 // Delete temp files
                 DeleteWindowsGuestFiles(filesToDelete);
             }
