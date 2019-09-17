@@ -139,6 +139,10 @@ namespace CloudOSTunnel.Controllers
             {
                 if (e.Message.Contains("Failed to authenticate"))
                 {
+                    if(e.Message.Contains("Failed to authenticate with the guest operating system using the supplied credentials"))
+                    {
+                        return Unauthorized("OS Credentials failed to validate. Check OS Account info or the vcenter permissions.");
+                    }
                     return Unauthorized();
                 }
                 else

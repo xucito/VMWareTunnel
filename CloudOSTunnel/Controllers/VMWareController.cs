@@ -32,5 +32,18 @@ namespace CloudOSTunnel.Controllers
                 Exists = result
             });
         }
+
+        [HttpPost]
+        [Route("tunnel-user")]
+        public async Task<IActionResult> AddTunnelUser([FromBody] PostTunnelUserVM request)
+        {
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
+            var result = await client.AddTunnelUser(request.NewUsername, request.NewPassword);
+            client.Logout();
+            return Ok(new
+            {
+                successful = result
+            });
+        }
     }
 }
