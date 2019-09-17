@@ -941,7 +941,6 @@ namespace CloudOSTunnel.Clients
                     if (!base64Payload)
                     {
                         // Single command e.g. (Get-WmiObject -ClassName Win32_OperatingSystem).LastBootUpTime
-                        isReboot = IsRebootCommand(command);
                         invoker = WrapWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
                         filesToDelete = new string[] { stdoutPathGuest, stderrPathGuest };
                     }
