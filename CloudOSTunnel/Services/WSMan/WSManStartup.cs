@@ -43,9 +43,10 @@ namespace CloudOSTunnel.Services.WSMan
             app.UseHttpsRedirection();
             app.UseMvc();
             app.Run(wsmanHandler.HandleRequest);
-            /* app.Run(async context =>
+            /*
+            app.Run(async context =>
             {
-                await context.Response.WriteAsync("Hello, World!");
+                await wsmanHandler.HandleRequest(context);
             });*/
         }
     }

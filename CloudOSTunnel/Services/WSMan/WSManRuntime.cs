@@ -329,7 +329,7 @@ namespace CloudOSTunnel.Services.WSMan
             string stdinCommand = DecodeCommand(encodedCommand, CommandType.StdinCommand);
 
             LogInformation(string.Format("Received stdin command {0} chars", stdinCommand.Length));
-            //LogDebug(stdinCommand);
+            //LogWarning(stdinCommand);
 
             // Payload is encoded in base64 if it has no space in first 32 chars
             payloadEncoded = !stdinCommand.Take(32).Contains(' ');
@@ -448,7 +448,7 @@ namespace CloudOSTunnel.Services.WSMan
             string requestMessageId = xml.GetElementsByTagName("a:MessageID").Item(0).InnerText;
             string signalCode = xml.GetElementsByTagName("rsp:Code").Item(0).InnerText;
 
-            LogInformation("Received signal terminate");
+            LogInformation(string.Format("Received signal code {0}", signalCode));
 
             string responseMessageId = "uuid:" + Guid.NewGuid();
 
