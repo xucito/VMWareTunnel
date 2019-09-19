@@ -33,7 +33,6 @@
 
   <ItemGroup>
     <Folder Include="Certificates\" />
-    <Folder Include="ViewModels\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -32,5 +32,18 @@ namespace CloudOSTunnel.Controllers
                 Exists = result
             });
         }
+
+        [HttpPost]
+        [Route("guest-os")]
+        public IActionResult GetGuestOs([FromBody] GetVMWareGuestOs request)
+        {
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
+            var result = client.GetGuestOs();
+            client.Logout();
+            return Ok(new
+            {
+                GuestOs = result
+            });
+        }
     }
 }

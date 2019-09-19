@@ -179,6 +179,48 @@ namespace CloudOSTunnel.Clients
         }
         #endregion Logging
 
+        #region Guest Info
+        public string GetGuestOs()
+        {
+            if (GuestFamily.Contains("Windows"))
+            {
+                return GuestFullName;
+            }
+
+            string cmd;
+
+            if(GuestFullName.Contains("CentOS"))
+            {
+                // CentOS Linux release 7.6.1810 (Core)
+                cmd = "cat /etc/centos-release";
+            }
+            else if(GuestFullName.Contains("Red Hat Enterprise Linux"))
+            {
+                // Red Hat Enterprise Linux Server release 7.4 (Maipo)
+                cmd = "cat /etc/redhat-release";
+            }
+            else if(GuestFullName.Contains("SUSE"))
+            {
+                // SUSE Linux Enterprise Server 11 (x86_64)
+                // VERSION = 11
+                // PATCHLEVEL = 4
+                cmd = "cat /etc/SuSE-release";
+            }
+            else if(GuestFullName.Contains("Ubuntu"))
+            {
+                // Description:    Ubuntu 18.04.3 LTS
+                cmd = "lsb_release -d";
+            }
+            else
+            {
+                throw new CloudOSTunnelException(string.Format("Unsupported guest OS {0}", GuestFullName));
+            }
+
+            return ExecuteLinuxCommand(cmd, out _, out _);
+        }
+
+        #endregion Guest Info
+        
         // Create a client using VM name
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
             string vmUsername, string vmPassword, string vmName, string moref)
