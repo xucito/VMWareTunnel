@@ -339,7 +339,7 @@ namespace CloudOSTunnel.Clients
             do
             {
                 // Reduce number of calls to vCenter
-                Thread.Sleep(500);
+                Thread.Sleep(1000);
 
                 if (stopWatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
