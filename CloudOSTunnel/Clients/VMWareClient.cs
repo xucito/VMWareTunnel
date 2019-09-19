@@ -31,7 +31,7 @@ namespace CloudOSTunnel.Clients
         private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 1800;
         // Maximum time for VM guest to run a program
         // - Note that it can take long to install updates
-        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
+        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 7200;
         // Maximum time to wait for guest operations to be ready, note the below:
         // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
         // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
