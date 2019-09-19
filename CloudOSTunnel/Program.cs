@@ -14,14 +14,7 @@ namespace CloudOSTunnel
     {
         public static void Main(string[] args)
         {
-            try
-            {
-                CreateWebHostBuilder(args).Build().Run();
-            }
-            catch(Exception e)
-            {
-
-            }
+            CreateWebHostBuilder(args).Build().Run();
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>

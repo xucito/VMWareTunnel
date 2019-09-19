@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <Folder Include="Certificates\" />
+    <Folder Include="Scripts\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,6 +44,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Certificates\PleaseReplaceMe.pfx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Scripts\CloudOSTunnelSetup.sh">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

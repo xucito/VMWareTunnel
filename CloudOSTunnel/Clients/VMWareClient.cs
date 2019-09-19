@@ -36,7 +36,7 @@ namespace CloudOSTunnel.Clients
         // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
         // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
         private const int GUEST_OPERATIONS_TIMEOUT_SECONDS = 3600;
-       
+
         private GuestOperationsManager _guestOperationsManager;
         private GuestOperationsManager GuestOperationsManager
         {
@@ -222,7 +222,7 @@ namespace CloudOSTunnel.Clients
         #endregion Guest Info
         
         // Create a client using VM name
-        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword,
             string vmUsername, string vmPassword, string vmName, string moref)
         {
             this.IsRebooting = false;
@@ -301,7 +301,7 @@ namespace CloudOSTunnel.Clients
         }
 
         // Create a client using VM moref
-        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword, 
+        public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword,
             string vmUsername, string vmPassword, string moref)
         {
             this.IsRebooting = false;
@@ -435,7 +435,7 @@ namespace CloudOSTunnel.Clients
                     throw new CloudOSTunnelException(msg);
                 }
 
-                shutdown = vm.Guest.ToolsRunningStatus == "guestToolsNotRunning"; 
+                shutdown = vm.Guest.ToolsRunningStatus == "guestToolsNotRunning";
             } while (!shutdown);
         }
 
@@ -453,7 +453,7 @@ namespace CloudOSTunnel.Clients
             do
             {
                 var vm = (VirtualMachine)client.GetView(_vm, null);
-                if(stopWatch.Elapsed.TotalSeconds > GUEST_OPERATIONS_TIMEOUT_SECONDS)
+                if (stopWatch.Elapsed.TotalSeconds > GUEST_OPERATIONS_TIMEOUT_SECONDS)
                 {
                     throw new CloudOSTunnelException("Awaiting guest operations timed out");
                 }
@@ -477,7 +477,7 @@ namespace CloudOSTunnel.Clients
         {
             var result = FileManager.ListFilesInGuest(_vm, _executingCredentials, folderPath, null, 200, fileName);
 
-            if (result == null)
+            if (result == null || result.Files == null)
             {
                 return false;
             }
@@ -1097,6 +1097,38 @@ namespace CloudOSTunnel.Clients
             {
                 LogError("Failed to end session correctly, check " + _vm.Value + " at directory " + _baseOutputPath);
             }
+        }
+
+        public async Task<bool> AddTunnelUser(string username, string hashedPassword)
+        {
+            //Upload the script
+            var file = await System.IO.File.ReadAllBytesAsync("./Scripts/CloudOSTunnelSetup.sh");
+
+            Logger.LogInformation("Uploading file");
+            await UploadFile("/tmp/CloudOSTunnelSetup.sh", file);
+
+            Logger.LogInformation("Adding permissions");
+            var changePermissionId = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            {
+                ProgramPath = FileExist("/bin/", "chmod") ? "/bin/chmod" : "/bin/usr/chmod",
+                Arguments = "+x /tmp/CloudOSTunnelSetup.sh",
+                WorkingDirectory = "/tmp"
+            });
+
+
+            AwaitProcess(changePermissionId, out _);
+
+            //execute script
+            var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            {
+                ProgramPath = "/tmp/CloudOSTunnelSetup.sh",
+                Arguments = username + " " + hashedPassword,
+                WorkingDirectory = "/tmp"
+            });
+
+            int? exitCode = null;
+            var result = AwaitProcess(pid, out exitCode);
+            return result;
         }
 
         /// <summary>
