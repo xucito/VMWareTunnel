@@ -31,7 +31,7 @@ namespace CloudOSTunnel.Clients
         private const int GUEST_TIME_TO_SHUTDOWN_SECONDS = 1800;
         // Maximum time for VM guest to run a program
         // - Note that it can take long to install updates
-        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 3600;
+        private const int GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS = 7200;
         // Maximum time to wait for guest operations to be ready, note the below:
         // - VMware Tools takes time to load completely and guest operations may experience transient states e.g. up,down,up..
         // - After Windows patching, it can take long time to boot into operating system, hence a high timeout value
@@ -129,6 +129,12 @@ namespace CloudOSTunnel.Clients
         // Root path in Windows guest (to store temporal files)
         private const string windowsGuestRoot = @"C:\Users\Public\Documents";
 
+        // Get Windows guest full path for a file name
+        private string GetWindowsGuestPath(string filename)
+        {
+            return string.Format(@"{0}\{1}", windowsGuestRoot, filename);
+        }
+
         internal string VmUser
         {
             get { return _executingCredentials.Username; }
@@ -173,6 +179,48 @@ namespace CloudOSTunnel.Clients
         }
         #endregion Logging
 
+        #region Guest Info
+        public string GetGuestOs()
+        {
+            if (GuestFamily.Contains("Windows"))
+            {
+                return GuestFullName;
+            }
+
+            string cmd;
+
+            if(GuestFullName.Contains("CentOS"))
+            {
+                // CentOS Linux release 7.6.1810 (Core)
+                cmd = "cat /etc/centos-release";
+            }
+            else if(GuestFullName.Contains("Red Hat Enterprise Linux"))
+            {
+                // Red Hat Enterprise Linux Server release 7.4 (Maipo)
+                cmd = "cat /etc/redhat-release";
+            }
+            else if(GuestFullName.Contains("SUSE"))
+            {
+                // SUSE Linux Enterprise Server 11 (x86_64)
+                // VERSION = 11
+                // PATCHLEVEL = 4
+                cmd = "cat /etc/SuSE-release";
+            }
+            else if(GuestFullName.Contains("Ubuntu"))
+            {
+                // Description:    Ubuntu 18.04.3 LTS
+                cmd = "lsb_release -d";
+            }
+            else
+            {
+                throw new CloudOSTunnelException(string.Format("Unsupported guest OS {0}", GuestFullName));
+            }
+
+            return ExecuteLinuxCommand(cmd, out _, out _);
+        }
+
+        #endregion Guest Info
+        
         // Create a client using VM name
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword,
             string vmUsername, string vmPassword, string vmName, string moref)
@@ -326,21 +374,37 @@ namespace CloudOSTunnel.Clients
         /// <returns>True if process exited, otherwise false</returns>
         public bool AwaitProcess(long pid, out int? exitCode, int timeoutSeconds = GUEST_OPERATIONS_TASK_TIMEOUT_SECONDS)
         {
-            GuestProcessInfo[] process;
+            GuestProcessInfo[] process = null;
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
 
             do
             {
+                // Reduce number of calls to vCenter
+                Thread.Sleep(1000);
+
                 if (stopWatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
                     exitCode = null;
                     return false;
                 }
-                // "operation not allowed" will be thrown if concurrent processes are initiated
-                process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
-                // Reduce number of calls to vCenter
-                Thread.Sleep(500);
+                try
+                {
+                    // "The operation is not allowed in the current state" will be thrown on occassion
+                    process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
+                }
+                catch(VimException ex)
+                {
+                    if(ex.Message.Contains("The operation is not allowed in the current state"))
+                    {
+                        LogWarning("Encountered operation not allowed while awaiting process, ignore and retry");
+                        continue;
+                    }
+                    else
+                    {
+                        throw ex;
+                    }
+                }
             } while (process.Count() != 1 || process[0].EndTime == null);
 
             // If the process was started using StartProgramInGuest then the process exit code 
@@ -842,8 +906,9 @@ namespace CloudOSTunnel.Clients
         public CommandResult ExecuteWindowsCommand(string command)
         {
             string vmPrefix = GetWsmanFilePrefix();
-            string stdoutPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stdout.txt");
-            string stderrPathGuest = Path.Join(windowsGuestRoot, vmPrefix + "_stderr.txt");
+            
+            string stdoutPathGuest = GetWindowsGuestPath(vmPrefix + "_stdout.txt");
+            string stderrPathGuest = GetWindowsGuestPath(vmPrefix + "_stderr.txt");
 
             string fullCommand = WrapWindowsCommand(command, stdoutPathGuest, stderrPathGuest);
 
@@ -891,10 +956,10 @@ namespace CloudOSTunnel.Clients
 
             string filePrefix = GetWsmanFilePrefix(commandId);
 
-            string stdoutPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_stdout.txt");
-            string stderrPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_stderr.txt");
-            string payloadPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_payload.txt");
-            string cmdPathGuest = Path.Join(windowsGuestRoot, filePrefix + "_command.ps1");
+            string stdoutPathGuest = GetWindowsGuestPath(filePrefix + "_stdout.txt");
+            string stderrPathGuest = GetWindowsGuestPath(filePrefix + "_stderr.txt");
+            string payloadPathGuest = GetWindowsGuestPath(filePrefix + "_payload.txt");
+            string cmdPathGuest = GetWindowsGuestPath(filePrefix + "_command.ps1");
 
             string cmdPathServer = Path.Join(Path.GetTempPath(), port + "_command.ps1");
 
