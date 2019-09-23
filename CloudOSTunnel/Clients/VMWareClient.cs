@@ -216,7 +216,7 @@ namespace CloudOSTunnel.Clients
                 throw new CloudOSTunnelException(string.Format("Unsupported guest OS {0}", GuestFullName));
             }
 
-            return ExecuteLinuxCommand(cmd, out _, out _);
+            return ExecuteLinuxCommand(cmd);
         }
 
         #endregion Guest Info
@@ -667,6 +667,45 @@ namespace CloudOSTunnel.Clients
                 Console.WriteLine("Failed to wait till command ended.");
             }
             PrivateFileLocation = _baseOutputPath + "/vmwaretunnelkey";
+        }
+
+        public string ExecuteLinuxCommand(string command)
+        {
+            // Save command as temp file
+            var serverScriptPath = Path.GetTempFileName();
+            var guestScriptPath = "/tmp/temp.sh";
+            var guestOutputPath = "/tmp/out.txt";
+
+            // Upload script file
+            UploadFile(command, serverScriptPath, guestScriptPath).Wait();
+
+            // Set script executable
+            var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            {
+                ProgramPath = "/bin/chmod",
+                Arguments = string.Format("751 {0}", guestScriptPath),
+                WorkingDirectory = "/tmp"
+            });
+            AwaitProcess(pid, out _);
+
+            // Execute script
+            pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            {
+                ProgramPath = "/bin/bash",
+                Arguments = string.Format("{0} > {1}", guestScriptPath, guestOutputPath),
+                WorkingDirectory = "/tmp"
+            });
+            AwaitProcess(pid, out _);
+
+            // Copy output
+            var output = ReadFile(_vm, _executingCredentials, guestOutputPath);
+
+            // Cleanup
+            FileManager.DeleteFileInGuest(_vm, _executingCredentials, guestScriptPath);
+            FileManager.DeleteFileInGuest(_vm, _executingCredentials, guestOutputPath);
+            File.Delete(serverScriptPath);
+
+            return output;
         }
 
         public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
