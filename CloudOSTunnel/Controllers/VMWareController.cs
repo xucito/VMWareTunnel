@@ -46,6 +46,7 @@ namespace CloudOSTunnel.Controllers
             });
         }
 
+        [HttpPost]
         [Route("tunnel-user")]
         public async Task<IActionResult> AddTunnelUser([FromBody] PostTunnelUserVM request)
         {
