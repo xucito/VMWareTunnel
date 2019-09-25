@@ -116,7 +116,7 @@ namespace CloudOSTunnel.Clients
 
         #region Linux Guest Attributes
         public string EntryMessage { get; set; }
-        private string _baseOutputPath = "/tmp/vmwaretunnel-";
+        private string _baseOutputPath = "";
         public int SSHMessageCount = 0;
         public string TempPath { get { return _baseOutputPath; } }
         public bool ExecuteAsRoot { get; set; }
@@ -189,24 +189,24 @@ namespace CloudOSTunnel.Clients
 
             string cmd;
 
-            if(GuestFullName.Contains("CentOS"))
+            if (GuestFullName.Contains("CentOS"))
             {
                 // CentOS Linux release 7.6.1810 (Core)
                 cmd = "cat /etc/centos-release";
             }
-            else if(GuestFullName.Contains("Red Hat Enterprise Linux"))
+            else if (GuestFullName.Contains("Red Hat Enterprise Linux"))
             {
                 // Red Hat Enterprise Linux Server release 7.4 (Maipo)
                 cmd = "cat /etc/redhat-release";
             }
-            else if(GuestFullName.Contains("SUSE"))
+            else if (GuestFullName.Contains("SUSE"))
             {
                 // SUSE Linux Enterprise Server 11 (x86_64)
                 // VERSION = 11
                 // PATCHLEVEL = 4
                 cmd = "cat /etc/SuSE-release";
             }
-            else if(GuestFullName.Contains("Ubuntu"))
+            else if (GuestFullName.Contains("Ubuntu"))
             {
                 // Description:    Ubuntu 18.04.3 LTS
                 cmd = "lsb_release -d";
@@ -220,10 +220,11 @@ namespace CloudOSTunnel.Clients
         }
 
         #endregion Guest Info
-        
+
+
         // Create a client using VM name
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword,
-            string vmUsername, string vmPassword, string vmName, string moref)
+            string vmUsername, string vmPassword, string vmName, string moref, bool setupHost = false)
         {
             this.IsRebooting = false;
             this.IsExecuting = false;
@@ -278,31 +279,34 @@ namespace CloudOSTunnel.Clients
                 Password = vmPassword
             };
 
-            if (!GuestFamily.ToLower().Contains("window"))
+            if (setupHost)
             {
-                SessionId = RandomString(6, true);
-                _baseOutputPath = _baseOutputPath + SessionId;
+                if (!GuestFamily.ToLower().Contains("window"))
+                {
+                    SessionId = RandomString(6, true);
+                    _baseOutputPath = "/home/" + vmUsername + "/vmware-tunnel-" + SessionId;
 
-                ExecuteAsRoot = true;
+                    ExecuteAsRoot = true;
 
-                SetupLinuxKey();
-                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
-                EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
-                //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
-                SSHMessageCount = EntryMessage.Count();
-                HostName = ExecuteLinuxCommand("hostname", out _, out _);
-                var test = ExecuteLinuxCommand("sleep 0", out _, out _);
-                //HostName = HostName.Substring(SSHMessageCount);
-            }
-            else
-            {
-                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+                    SetupLinuxKey();
+                    EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+                    EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
+                    //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
+                    SSHMessageCount = EntryMessage.Count();
+                    HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                    var test = ExecuteLinuxCommand("sleep 0", out _, out _);
+                    //HostName = HostName.Substring(SSHMessageCount);
+                }
+                else
+                {
+                    HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+                }
             }
         }
 
         // Create a client using VM moref
         public VMWareClient(ILoggerFactory loggerFactory, string serviceUrl, string vcenterUsername, string vcenterPassword,
-            string vmUsername, string vmPassword, string moref)
+            string vmUsername, string vmPassword, string moref, bool setupHost = false)
         {
             this.IsRebooting = false;
             this.IsExecuting = false;
@@ -326,29 +330,30 @@ namespace CloudOSTunnel.Clients
             GuestFamily = foundVM.Guest.GuestFamily;
             GuestFullName = foundVM.Guest.GuestFullName;
 
-            SessionId = RandomString(6, true);
-            _baseOutputPath = _baseOutputPath + SessionId;
-
             _executingCredentials = new NamePasswordAuthentication()
             {
                 Username = vmUsername,
                 Password = vmPassword
             };
 
-            if (!GuestFamily.ToLower().Contains("window"))
+            if (setupHost)
             {
-                SessionId = RandomString(6, true);
-                _baseOutputPath = _baseOutputPath + SessionId;
+                Logger.LogInformation("Setting up host...");
+                if (!GuestFamily.ToLower().Contains("window"))
+                {
+                    SessionId = RandomString(6, true);
+                    _baseOutputPath = "/home/" + vmUsername + "/vmware-tunnel-" + SessionId;
 
-                ExecuteAsRoot = vmUsername == null ? true : false;
+                    ExecuteAsRoot = vmUsername == null ? true : false;
 
-                SetupLinuxKey();
-                HostName = ExecuteLinuxCommand("hostname", out _, out _);
-                EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
-            }
-            else
-            {
-                HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+                    SetupLinuxKey();
+                    HostName = ExecuteLinuxCommand("hostname", out _, out _);
+                    EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+                }
+                else
+                {
+                    HostName = ExecuteWindowsCommand("hostname").stdout.Trim();
+                }
             }
         }
 
@@ -393,9 +398,9 @@ namespace CloudOSTunnel.Clients
                     // "The operation is not allowed in the current state" will be thrown on occassion
                     process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
                 }
-                catch(VimException ex)
+                catch (VimException ex)
                 {
-                    if(ex.Message.Contains("The operation is not allowed in the current state"))
+                    if (ex.Message.Contains("The operation is not allowed in the current state"))
                     {
                         LogWarning("Encountered operation not allowed while awaiting process, ignore and retry");
                         continue;
@@ -648,7 +653,7 @@ namespace CloudOSTunnel.Clients
                 WorkingDirectory = "/tmp"
             });
 
-            if(!AwaitProcess(pid, out _))
+            if (!AwaitProcess(pid, out _))
             {
                 Console.WriteLine("Failed to wait till command ended.");
             }
@@ -785,7 +790,7 @@ namespace CloudOSTunnel.Clients
         private CommandResult InvokeWindowsCommand(string fullCommand, bool isReboot,
             string stdoutPathGuest = null, string stderrPathGuest = null)
         {
-            if(stdoutPathGuest == null && stderrPathGuest != null)
+            if (stdoutPathGuest == null && stderrPathGuest != null)
             {
                 throw new CloudOSTunnelException("Both stdout and stderr need to be specified or neither.");
             }
@@ -840,7 +845,7 @@ namespace CloudOSTunnel.Clients
                     LogInformation("Guest is up");
                     // Indicate reboot has completed
                     this.IsRebooting = false;
-                    LogInformation("Reboot has completed"); 
+                    LogInformation("Reboot has completed");
                 }
                 else
                 {
@@ -945,7 +950,7 @@ namespace CloudOSTunnel.Clients
         public CommandResult ExecuteWindowsCommand(string command)
         {
             string vmPrefix = GetWsmanFilePrefix();
-            
+
             string stdoutPathGuest = GetWindowsGuestPath(vmPrefix + "_stdout.txt");
             string stderrPathGuest = GetWindowsGuestPath(vmPrefix + "_stderr.txt");
 
@@ -1112,7 +1117,7 @@ namespace CloudOSTunnel.Clients
                 result = InvokeWindowsCommand(invoker, isReboot, stdoutPathGuest, stderrPathGuest);
             }
 
-            if(filesToDelete != null)
+            if (filesToDelete != null)
             {
                 // Delete temp files
                 DeleteWindowsGuestFiles(filesToDelete);
@@ -1160,8 +1165,8 @@ namespace CloudOSTunnel.Clients
             //execute script
             var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
-                ProgramPath = "/tmp/CloudOSTunnelSetup.sh",
-                Arguments = username + " " + hashedPassword,
+                ProgramPath = FileExist("/bin", "sudo") ? "/bin/sudo" : "/usr/bin/sudo",
+                Arguments = "/tmp/CloudOSTunnelSetup.sh " + username + " " + hashedPassword,
                 WorkingDirectory = "/tmp"
             });
 
@@ -1179,6 +1184,21 @@ namespace CloudOSTunnel.Clients
             _executingCredentials.Username = null;
             _executingCredentials.Password = null;
             _executingCredentials = null;
+        }
+
+        public void CleanAuthorizedKeys(string username)
+        {
+            var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
+            {
+                ProgramPath = FileExist("/bin", "sed") ? "/bin/sed" : "/usr/bin/sed",
+                Arguments = _baseOutputPath + "-i '/" + username + "@/d' /home/" + username + "/.ssh/authorized_keys",
+                WorkingDirectory = "/tmp"
+            });
+
+            if (!AwaitProcess(pid, out _))
+            {
+                Console.WriteLine("Failed to wait till command ended.");
+            }
         }
     }
 }

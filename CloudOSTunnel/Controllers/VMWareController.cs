@@ -24,7 +24,7 @@ namespace CloudOSTunnel.Controllers
         [Route("file-exists")]
         public IActionResult FileExists([FromBody] GetVMWareFileExists request)
         {
-            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef, false);
             var result = client.FileExist(request.FolderPath, request.FileName);
             client.Logout();
             return Ok(new
@@ -37,7 +37,7 @@ namespace CloudOSTunnel.Controllers
         [Route("guest-os")]
         public IActionResult GetGuestOs([FromBody] GetVMWareGuestOs request)
         {
-            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef, false);
             var result = client.GetGuestOs();
             client.Logout();
             return Ok(new
@@ -50,13 +50,23 @@ namespace CloudOSTunnel.Controllers
         [Route("tunnel-user")]
         public async Task<IActionResult> AddTunnelUser([FromBody] PostTunnelUserVM request)
         {
-            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef);
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef, false);
             var result = await client.AddTunnelUser(request.NewUsername, request.NewPassword);
             client.Logout();
             return Ok(new
             {
                 successful = result
             });
+        }
+
+        [HttpDelete]
+        [Route("tunnel-user/authorized_keys")]
+        public async Task<IActionResult> CleanAuthorizedKeys([FromBody] PostCleanAuthorizedKeyFiles request)
+        {
+            var client = new VMWareClient(_logger, request.ServiceUrl, request.VCenterUsername, request.VCenterPassword, request.OSUsername, request.OSPassword, request.MoRef, false);
+            client.CleanAuthorizedKeys(request.UserToClean);
+            client.Logout();
+            return Ok();
         }
     }
 }

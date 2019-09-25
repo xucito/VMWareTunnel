@@ -89,11 +89,11 @@ namespace CloudOSTunnel.Controllers
                 
                 if ((value.VMName != "" && value.VMName != null))
                 {
-                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef);
+                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.VMName, value.MoRef, true);
                 }
                 else if (value.MoRef != "" && value.MoRef != null)
                 {
-                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef);
+                    client = new Clients.VMWareClient(_loggerFactory, value.ServiceUrl, value.VCenterUsername, value.VCenterPassword, value.OSUsername, value.OSPassword, value.MoRef, true);
                 }
                 else
                 {
