@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -64,6 +65,8 @@ namespace CloudOSTunnel.Services.Handlers
             }
             else
             {
+
+                Console.WriteLine("Received: " + System.Text.Encoding.UTF8.GetString(data));
                 //used to allow contiued communication
                 bool isComplete = false;
                 var result = _client.ExecuteLinuxCommand(System.Text.Encoding.UTF8.GetString(data), out isComplete, out PID);
@@ -71,16 +74,35 @@ namespace CloudOSTunnel.Services.Handlers
 
                 var finalBytes = Encoding.ASCII.GetBytes(result);
 
-                for (var i = 0; i < finalBytes.Length; i += Session.LocalChannelDataPacketSize)
+                /*for (var i = 0; i < finalBytes.Length; i += Session.LocalChannelDataPacketSize)
                 {
                     var size = finalBytes.Skip(i).Take(i + Session.LocalChannelDataPacketSize <= finalBytes.Length ? Session.LocalChannelDataPacketSize : finalBytes.Length - i).ToArray();
                     DataReceived?.Invoke(this, size);
 
+                }*/
+
+                var splitResult = result.Split("\r\n");//.SelectMany(r => r.Split('\r')).SelectMany(r => r.Split('\n'));
+
+                foreach (var section in splitResult)
+                {
+                    Console.WriteLine("Replying: " + section);
+                    DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(section));
+                    Thread.Sleep(500);
                 }
-              //  DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(result));
+               // DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(""));
+                /*var totalBytes = Encoding.ASCII.GetBytes(result);
+                foreach*/
+                // DataReceived?.Invoke(this, totalBytes);
                 EofReceived?.Invoke(this, EventArgs.Empty);
                 if (isComplete)
+                {
+                    Console.WriteLine("Sending Closed Received.");
                     CloseReceived?.Invoke(this, 0);
+                }
+                else
+                {
+                    Console.WriteLine("PROCESS WAS NOT COMPLETED!");
+                }
             }
             return;
         }

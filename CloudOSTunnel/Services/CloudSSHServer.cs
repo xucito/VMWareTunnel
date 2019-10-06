@@ -215,7 +215,12 @@ namespace CloudOSTunnel.Services
                 }
             }
 
-
+            if(e.CommandText.Contains("/bin/sh -c 'sudo -H -S -n  -u root /bin/sh -c '"))
+            {
+                Console.WriteLine("TESTING");
+            }
+            Logger.LogDebug("Received Raw message: " + e.CommandText);
+            
             if (e.CommandText != null)
             {
                 if (e.CommandText.Split(' ').First() == "scp")

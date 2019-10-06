@@ -347,8 +347,11 @@ namespace CloudOSTunnel.Clients
                     ExecuteAsRoot = vmUsername == null ? true : false;
 
                     SetupLinuxKey();
-                    HostName = ExecuteLinuxCommand("hostname", out _, out _);
                     EntryMessage = ExecuteLinuxCommand("sleep 0", out _, out _);
+                    EntryMessage = EntryMessage.Replace("Connection to 127.0.0.1 closed.", "");
+                    //EntryMessage = EntryMessage.Trim(new char[] { '\n', '\r' });
+                    SSHMessageCount = EntryMessage.Count();
+                    HostName = ExecuteLinuxCommand("hostname", out _, out _);
                 }
                 else
                 {
@@ -392,6 +395,12 @@ namespace CloudOSTunnel.Clients
                 {
                     exitCode = null;
                     return false;
+                }
+
+                double totalSeconds;
+                if ((totalSeconds = stopWatch.Elapsed.TotalSeconds) > 60)
+                {
+                    Console.WriteLine("Deteced long running process on " + FullVMName + "! (" + totalSeconds + "s elapsed)");
                 }
                 try
                 {
@@ -736,7 +745,7 @@ namespace CloudOSTunnel.Clients
 
             // Thread.Sleep(1000);
 
-            isComplete = AwaitProcess(pid, out _);
+            isComplete = AwaitProcess(pid, out _, 300);
 
             var files = FileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
 
@@ -753,7 +762,7 @@ namespace CloudOSTunnel.Clients
 
                 FileManager.DeleteFileInGuest(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
 
-                return (output.Trim(new char[] { '\n', '\r' }).Substring(SSHMessageCount).Replace("Connection to 127.0.0.1 closed.", ""));
+                return (output.Trim(new char[] { '\n', '\r' })/*.Substring(SSHMessageCount)*/.Replace("Connection to 127.0.0.1 closed.", ""));
             }
             else
             {
@@ -871,7 +880,7 @@ namespace CloudOSTunnel.Clients
                 {
                     hasOutput = true;
                     stdout = stderr = null;
-                    if (AwaitProcess(pid, out exitCode))
+                    if (AwaitProcess(pid, out exitCode, 300))
                     {
                         if (stdoutPathGuest != null && stderrPathGuest != null)
                         {
@@ -1166,7 +1175,7 @@ namespace CloudOSTunnel.Clients
             var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = FileExist("/bin", "sudo") ? "/bin/sudo" : "/usr/bin/sudo",
-                Arguments = "/tmp/CloudOSTunnelSetup.sh " + username + " " + hashedPassword,
+                Arguments = (FileExist("/bin", "sh") ? "/bin/sh" : "/usr/bin/sh") + " /tmp/CloudOSTunnelSetup.sh " + username + " " + hashedPassword,
                 WorkingDirectory = "/tmp"
             });
 
