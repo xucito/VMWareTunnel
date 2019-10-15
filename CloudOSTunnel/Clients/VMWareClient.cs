@@ -194,7 +194,7 @@ namespace CloudOSTunnel.Clients
                 // CentOS Linux release 7.6.1810 (Core)
                 cmd = "cat /etc/centos-release";
             }
-            else if (GuestFullName.Contains("Red Hat Enterprise Linux"))
+            else if (GuestFullName.Contains("Red Hat Enterprise Linux") || GuestFullName.Contains("Oracle Linux"))
             {
                 // Red Hat Enterprise Linux Server release 7.4 (Maipo)
                 cmd = "cat /etc/redhat-release";
