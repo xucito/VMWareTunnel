@@ -194,7 +194,7 @@ namespace CloudOSTunnel.Clients
                 // CentOS Linux release 7.6.1810 (Core)
                 cmd = "cat /etc/centos-release";
             }
-            else if (GuestFullName.Contains("Red Hat Enterprise Linux"))
+            else if (GuestFullName.Contains("Red Hat Enterprise Linux") || GuestFullName.Contains("Oracle Linux"))
             {
                 // Red Hat Enterprise Linux Server release 7.4 (Maipo)
                 cmd = "cat /etc/redhat-release";
@@ -386,6 +386,8 @@ namespace CloudOSTunnel.Clients
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
 
+            LogInformation(string.Format("Awaiting process {0}", pid));
+
             do
             {
                 // Reduce number of calls to vCenter
@@ -412,6 +414,11 @@ namespace CloudOSTunnel.Clients
                     if (ex.Message.Contains("The operation is not allowed in the current state"))
                     {
                         LogWarning("Encountered operation not allowed while awaiting process, ignore and retry");
+                        continue;
+                    }
+                    else if(ex.Message.Contains("The guest operations agent could not be contacted"))
+                    {
+                        LogWarning("Encountered agent not contactable while awaiting process, ignore and retry");
                         continue;
                     }
                     else
@@ -466,6 +473,9 @@ namespace CloudOSTunnel.Clients
 
             do
             {
+                // Reduce number of calls to vCenter
+                Thread.Sleep(1000);
+
                 var vm = (VirtualMachine)client.GetView(_vm, null);
                 if (stopWatch.Elapsed.TotalSeconds > GUEST_OPERATIONS_TIMEOUT_SECONDS)
                 {
