@@ -58,8 +58,18 @@ then
 fi
 
 # setup sudo access
-if [ ! -f "/etc/sudoers.d/$user_name" ]
+if [ -f /etc/SuSE-release ]
 then
-	echo "Setting up sudo access"
-	echo "${user_name}	ALL=(ALL) 	NOPASSWD: ALL" > /etc/sudoers.d/$user_name
+    grep "$user_name" /etc/sudoers > /dev/null
+       if [ $? -ne 0 ]
+    then
+        echo "Setting up sudo access on Suse"
+         echo "${user_name} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    fi
+else
+  if [ ! -f /etc/sudoers.d/${user_name} ]
+  then
+    echo "Setting up sudo access"
+    echo "${user_name}    ALL=(ALL)     NOPASSWD: ALL" > /etc/sudoers.d/$user_name
+  fi
 fi

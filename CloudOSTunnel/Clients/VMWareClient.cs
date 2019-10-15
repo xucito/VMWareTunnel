@@ -880,7 +880,7 @@ namespace CloudOSTunnel.Clients
                 {
                     hasOutput = true;
                     stdout = stderr = null;
-                    if (AwaitProcess(pid, out exitCode, 300))
+                    if (AwaitProcess(pid, out exitCode))
                     {
                         if (stdoutPathGuest != null && stderrPathGuest != null)
                         {
