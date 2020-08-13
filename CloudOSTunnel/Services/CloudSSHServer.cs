@@ -1,5 +1,4 @@
-﻿using FxSsh;
-using FxSsh.Services;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +9,8 @@ using Microsoft.Extensions.Logging;
 using CloudOSTunnel.Clients;
 using CloudOSTunnel.Services.Handlers;
 using CloudOSTunnel.Utilities;
+using FxSsh;
+using FxSsh.Services;
 
 namespace CloudOSTunnel.Services
 {
@@ -239,7 +240,7 @@ namespace CloudOSTunnel.Services
                 else
                 {
                     channels[GetChannelId(port, e.Channel.ServerChannelId)].EofReceived += (ss, ee) => e.Channel.SendEof();
-                    channels[GetChannelId(port, e.Channel.ServerChannelId)].CloseReceived += (ss, ee) => e.Channel.SendClose(ee);
+                    channels[GetChannelId(port, e.Channel.ServerChannelId)].CloseReceived += (ss, ee) => e.Channel.SendClose(ee, false);
                     channels[GetChannelId(port, e.Channel.ServerChannelId)].DataReceived += (ss, ee) => e.Channel.SendData(ee);
                     e.Channel.EofReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].OnEndOfFile();
                     e.Channel.CloseReceived += (ss, ee) => channels[GetChannelId(port, e.Channel.ServerChannelId)].OnClose();

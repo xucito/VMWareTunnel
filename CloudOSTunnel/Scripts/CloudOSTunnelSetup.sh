@@ -31,7 +31,7 @@ id $user_name > /dev/null 2>&1
 if [ $? -ne 0 ]
 then
 	echo "Creating user"
-	useradd -m  $user_name -p "$pass_wd"
+	useradd -m $user_name -p "$pass_wd"
 	if [ $? -eq 0 ]
 	then
 		echo "user created successfully and setting up passwd"

@@ -3,6 +3,7 @@ using FxSsh;
 using FxSsh.Services;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -39,6 +40,8 @@ namespace CloudOSTunnel.Services.Handlers
 
         public override void OnData(byte[] data, string type = "")
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
             if (data.Length == 1)
             {
                 var loop = 0;
@@ -85,17 +88,25 @@ namespace CloudOSTunnel.Services.Handlers
 
                 foreach (var section in splitResult)
                 {
-                    Console.WriteLine("Replying: " + section);
-                    DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(section));
-                    Thread.Sleep(500);
+                    if (section != "")
+                    {
+                        Console.WriteLine("Replying: " + section);
+                        DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(section));
+                    }
                 }
-               // DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(""));
+                // DataReceived?.Invoke(this, Encoding.ASCII.GetBytes(""));
                 /*var totalBytes = Encoding.ASCII.GetBytes(result);
                 foreach*/
                 // DataReceived?.Invoke(this, totalBytes);
-                EofReceived?.Invoke(this, EventArgs.Empty);
+                //EofReceived?.Invoke(this, EventArgs.Empty);
                 if (isComplete)
                 {
+
+                    if (stopwatch.ElapsedMilliseconds < 2500)
+                    {
+                        Console.WriteLine("Add mandatory wait...");
+                        Thread.Sleep(2500 - (int)stopwatch.ElapsedMilliseconds);
+                    }
                     Console.WriteLine("Sending Closed Received.");
                     CloseReceived?.Invoke(this, 0);
                 }
@@ -104,6 +115,7 @@ namespace CloudOSTunnel.Services.Handlers
                     Console.WriteLine("PROCESS WAS NOT COMPLETED!");
                 }
             }
+            Console.WriteLine("Full request took : " + stopwatch.ElapsedMilliseconds);
             return;
         }
 

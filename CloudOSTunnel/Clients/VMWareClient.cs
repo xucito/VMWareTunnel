@@ -388,10 +388,10 @@ namespace CloudOSTunnel.Clients
 
             LogInformation(string.Format("Awaiting process {0}", pid));
 
+            var backoff = 500;
             do
             {
-                // Reduce number of calls to vCenter
-                Thread.Sleep(1000);
+                Thread.Sleep(backoff);
 
                 if (stopWatch.Elapsed.TotalSeconds > timeoutSeconds)
                 {
@@ -408,6 +408,12 @@ namespace CloudOSTunnel.Clients
                 {
                     // "The operation is not allowed in the current state" will be thrown on occassion
                     process = ProcessManager.ListProcessesInGuest(_vm, _executingCredentials, new long[] { pid });
+
+                    if (process.Count() != 1 || process[0].EndTime == null)
+                    {
+                        backoff += 200;
+                        Console.WriteLine("Adding back off.");
+                    }
                 }
                 catch (VimException ex)
                 {
@@ -416,7 +422,7 @@ namespace CloudOSTunnel.Clients
                         LogWarning("Encountered operation not allowed while awaiting process, ignore and retry");
                         continue;
                     }
-                    else if(ex.Message.Contains("The guest operations agent could not be contacted"))
+                    else if (ex.Message.Contains("The guest operations agent could not be contacted"))
                     {
                         LogWarning("Encountered agent not contactable while awaiting process, ignore and retry");
                         continue;
@@ -734,6 +740,8 @@ namespace CloudOSTunnel.Clients
 
         public string ExecuteLinuxCommand(string command, out bool isComplete, out long pid, string commandUniqueIdentifier = null)
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
             if (commandUniqueIdentifier == null)
             {
                 commandUniqueIdentifier = Guid.NewGuid().ToString();
@@ -752,32 +760,36 @@ namespace CloudOSTunnel.Clients
                 Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"") + ")\" > " + _baseOutputPath + "/" + outputFileName + " 2>&1",//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
                 WorkingDirectory = "/tmp"
             });
-
             // Thread.Sleep(1000);
 
             isComplete = AwaitProcess(pid, out _, 300);
+            Console.WriteLine("Execution took: " + stopwatch.ElapsedMilliseconds);
 
-            var files = FileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
+            // var files = FileManager.ListFilesInGuest(_vm, _executingCredentials, _baseOutputPath, null, null, outputFileName);
 
-            if (files.Files != null && files.Files.Count() == 1)
+            // if (files.Files != null && files.Files.Count() == 1)
+            // {
+            stopwatch.Restart();
+
+            var output = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
+
+            if (output.Contains('=') && !output.Contains(" "))
             {
-                var output = ReadFile(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
-
-                if (output.Contains('=') && !output.Contains(" "))
-                {
-                    output = output.Split('=').Last();
-                }
-
-                //fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
-
-                FileManager.DeleteFileInGuest(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
-
-                return (output.Trim(new char[] { '\n', '\r' })/*.Substring(SSHMessageCount)*/.Replace("Connection to 127.0.0.1 closed.", ""));
+                output = output.Split('=').Last();
             }
-            else
-            {
-                return "";
-            }
+
+            Console.WriteLine("Result reading took: " + stopwatch.ElapsedMilliseconds);
+            //fileManager.DeleteDirectoryInGuest(_vm, auth, _baseOutputPath, true);
+            stopwatch.Restart();
+            FileManager.DeleteFileInGuest(_vm, _executingCredentials, _baseOutputPath + "/" + outputFileName);
+
+            Console.WriteLine("Deletion took: " + stopwatch.ElapsedMilliseconds);
+            return (output.Trim(new char[] { '\n', '\r' })/*.Substring(SSHMessageCount)*/.Replace("Connection to 127.0.0.1 closed.", ""));
+            /*  }
+              else
+              {
+                  return "";
+              }*/
         }
 
         public void CleanUpLinuxTempFiles()
@@ -1168,13 +1180,13 @@ namespace CloudOSTunnel.Clients
             var file = await System.IO.File.ReadAllBytesAsync("./Scripts/CloudOSTunnelSetup.sh");
 
             Logger.LogInformation("Uploading file");
-            await UploadFile("/tmp/CloudOSTunnelSetup.sh", file);
+            await UploadFile("/home/" + _executingCredentials.Username + "/CloudOSTunnelSetup.sh", file);
 
             Logger.LogInformation("Adding permissions");
             var changePermissionId = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = FileExist("/bin/", "chmod") ? "/bin/chmod" : "/bin/usr/chmod",
-                Arguments = "+x /tmp/CloudOSTunnelSetup.sh",
+                Arguments = "+x /home/" + _executingCredentials.Username + "/CloudOSTunnelSetup.sh",
                 WorkingDirectory = "/tmp"
             });
 
@@ -1185,7 +1197,7 @@ namespace CloudOSTunnel.Clients
             var pid = ProcessManager.StartProgramInGuest(_vm, _executingCredentials, new GuestProgramSpec
             {
                 ProgramPath = FileExist("/bin", "sudo") ? "/bin/sudo" : "/usr/bin/sudo",
-                Arguments = (FileExist("/bin", "sh") ? "/bin/sh" : "/usr/bin/sh") + " /tmp/CloudOSTunnelSetup.sh " + username + " " + hashedPassword,
+                Arguments = (FileExist("/bin", "sh") ? "/bin/sh" : "/usr/bin/sh") + "/home/" + _executingCredentials.Username + "/CloudOSTunnelSetup.sh " + username + " " + hashedPassword,
                 WorkingDirectory = "/tmp"
             });
 
