@@ -295,12 +295,14 @@ namespace VMWareHypervisorTunnel.Clients
             var fullCommand = "/usr/bin/ssh" + " -i " + PrivateFileLocation + " -o StrictHostKeyChecking=no " + "127.0.0.1 \"(" + sshCommand.Replace("\"", "\\\"").Replace("\'", "\\\'") + ")\" &> " + _baseOutputPath + "/" + outputFileName;
             System.Diagnostics.Debug.WriteLine("Full command path:  " + fullCommand);
 
-          //  if (command.Split(' ')[0] != "/bin/sh")
-           // {
-                pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
+            //  if (command.Split(' ')[0] != "/bin/sh")
+            // {
+            //Uses strict key host checking
+            //https://askubuntu.com/questions/87449/how-to-disable-strict-host-key-checking-in-ssh
+            pid = processManager.StartProgramInGuest(_vm, auth, new GuestProgramSpec
                 {
                     ProgramPath = "/usr/bin/ssh",
-                    Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"","\\\"") + ")\" &> " + _baseOutputPath + "/" + outputFileName,//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
+                    Arguments = "-i " + PrivateFileLocation + " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -t -t " + "127.0.0.1 \"(" + sshCommand.Replace("\"","\\\"") + ")\" &> " + _baseOutputPath + "/" + outputFileName,//"-i key root@localhost \"(" + sshCommand + ")\" &> test",
                     WorkingDirectory = "/tmp"
                 });
             /*}

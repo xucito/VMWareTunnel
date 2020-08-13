@@ -49,11 +49,5 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\VMWareHypervisorTunnel\VMWareHypervisorTunnel.csproj">
-      <Project>{0E49A803-4B63-4039-8C55-0ED8ED4F9017}</Project>
-      <Name>VMWareHypervisorTunnel</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
